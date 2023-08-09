@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "outDir": "./dist/",
+    "noImplicitAny": true,
+    "module": "es6",
+    "target": "es5",
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "moduleResolution": "node",
+    "paths": {
+      "@src/*": ["./src/*"],
+      "@components/*": ["./src/Components/*"],
+      "@pages/*": ["./src/Pages/*"],
+      "@variables": ["./src/styles/variables.scss"],
+      "@styles/*": ["./src/styles/*"],
+      "@hooks/*": ["./src/hooks/*"],
+    },
+  },
+  "exclude": [
+    "node_modules"
+  ]
+}
