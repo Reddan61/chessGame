@@ -36,8 +36,10 @@ const getPlugins = () => {
   return plugins;
 };
 
+const mode = getMode()
+
 module.exports = {
-  mode: getMode(),
+  mode,
   target: getTarget(),
   plugins: getPlugins(),
   entry: path.resolve(__dirname, "src", "index.tsx"),
@@ -50,6 +52,8 @@ module.exports = {
       "@variables": path.resolve(__dirname, "src", "styles", "variables.scss"),
       "@styles": path.resolve(__dirname, "src", "styles"),
       "@hooks": path.resolve(__dirname, "src", "hooks"),
+      "@utils": path.resolve(__dirname, "src", "utils"),
+      "@svg": path.resolve(__dirname, "static", "svg"),
     },
     extensions: [".tsx", ".ts", ".js"],
   },
@@ -88,6 +92,10 @@ module.exports = {
         test: /\.tsx?$/,
         use: "ts-loader",
         exclude: /node_modules/,
+      },
+      {
+        test: /\.(png|jpe?g|gif|svg|webp|ico)$/i,
+        type: mode === "production" ? "asset" : "asset/resource",
       },
     ],
   },
