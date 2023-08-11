@@ -14,6 +14,8 @@
       "@variables": ["./src/styles/variables.scss"],
       "@styles/*": ["./src/styles/*"],
       "@hooks/*": ["./src/hooks/*"],
+      "@utils/*": ["./src/utils/*"],
+      "@svg/*": ["./static/svg/*"],
     },
   },
   "exclude": [
