@@ -22,7 +22,17 @@ export class ChessBoard {
     y: 8,
   };
 
-  private cells: Cell[][];
+  private canMoveOptions = {
+    color: "#646f41",
+    radius: 15,
+    startAngle: 0,
+    endAngle: 2 * Math.PI,
+  };
+
+  // cell[y][x]
+  private cells: Cell[][] = [];
+  private selectedCell: Cell | null = null;
+  private canMoveCells: [x: number, y: number][] = [];
 
   constructor(canvas: ChessBoard["canvas"]) {
     this.canvas = canvas;
@@ -70,21 +80,73 @@ export class ChessBoard {
   }
 
   private initFigures() {
-    const cell = this.cells[0][0];
+    // начальное расстановка фигур и подгрузка их картинок
+    return new Promise((res) => {
+      const cell = this.cells[6][1];
+      const pawn = new Pawn();
 
-    cell.setFigure(
-      new Pawn({
-        x: 1,
-        y: 1,
-      })
-    );
+      const img = pawn.getImage();
+      img.onload = () => {
+        cell.setFigure(pawn);
+        res(true);
+      };
+    });
   }
 
-  private init() {
+  private async init() {
     this.normalizeSize();
     this.initCells();
-    this.initFigures();
+    await this.initFigures();
+    this.initHandlers();
     this.update();
+  }
+
+  private clickHandler(e: MouseEvent) {
+    const { left, top } = this.canvas.getBoundingClientRect();
+    const { clientX, clientY } = e;
+
+    const mouseX = clientX - left;
+    const mouseY = clientY - top;
+
+    for (let i = 0; i < this.cells.length; i++) {
+      for (let j = 0; j < this.cells[i].length; j++) {
+        const cell = this.cells[i][j];
+
+        const { startX, startY, endX, endY, x, y } = cell.getPosition();
+
+        if (mouseX >= startX && mouseX <= endX) {
+          if (mouseY >= startY && mouseY <= endY) {
+            if (this.selectedCell) {
+              const cellFigure = cell.getFigure();
+              const canIMove = !!this.canMoveCells.filter(([moveX, moveY]) => {
+                // TODO: убрать проверку !cellFigure (добавить возможность бить вражеские фигуры)
+                return moveX === x && moveY === y && !cellFigure;
+              }).length;
+
+              if (canIMove) {
+                const selectedFigure = this.selectedCell.getFigure();
+
+                cell.setFigure(selectedFigure);
+                this.selectedCell.setFigure(null);
+                this.selectedCell = null;
+              } else {
+                this.selectedCell = cell;
+              }
+            } else {
+              this.selectedCell = cell;
+            }
+
+            break;
+          }
+        }
+      }
+    }
+
+    this.update();
+  }
+
+  private initHandlers() {
+    this.canvas.onclick = this.clickHandler.bind(this);
   }
 
   private drawFigures() {
@@ -95,16 +157,16 @@ export class ChessBoard {
 
         if (!figure) continue;
 
-        const {startX, startY, endX, endY } = cell.getPosition();
-        const imageSRC = figure.getImageSrc();
+        const { startX, startY } = cell.getPosition();
+        const { height, width } = cell.getSize();
+        const img = figure.getImage();
+        // const img = new Image();
+        this.ctx.drawImage(img, startX, startY, width, height);
+        // img.onload = () => {
+        //   console.log('da')
+        // };
 
-        const img = new Image();
-
-        img.onload = () => {
-          this.ctx.drawImage(img, startX, startY, endX, endY);
-        };
-
-        img.src = imageSRC;
+        // img.src = imageSRC;
       }
     }
   }
@@ -124,8 +186,58 @@ export class ChessBoard {
   private update() {
     this.drawBackGround();
     this.drawFigures();
+    this.drawDirections();
     console.log(this);
   }
+
+  private drawDirections() {
+    const cell = this.selectedCell;
+    const figure = cell?.getFigure();
+
+    if (!figure) {
+      this.canMoveCells = [];
+      return;
+    }
+
+    const { x, y } = cell.getPosition();
+    const directions = figure.getDirections();
+
+    const newCanMoveCells: ChessBoard["canMoveCells"] = [];
+
+    for (let i = 0; i < directions.length; i++) {
+      const [directionX, directionY] = directions[i];
+
+      const newX = x + directionX;
+      const newY = y + directionY;
+      const directionCell = this.cells[newY]?.[newX];
+
+      if (!directionCell) continue;
+
+      const {
+        startX,
+        startY,
+        x: directionCellX,
+        y: directionCellY,
+      } = directionCell.getPosition();
+      const { width, height } = directionCell.getSize();
+
+      const arcX = startX + width / 2;
+      const arcY = startY + height / 2;
+
+      const { color, radius, endAngle, startAngle } = this.canMoveOptions;
+
+      this.ctx.beginPath();
+      this.ctx.fillStyle = color;
+      this.ctx.arc(arcX, arcY, radius, startAngle, endAngle);
+      this.ctx.fill();
+      this.ctx.closePath();
+
+      newCanMoveCells.push([directionCellX, directionCellY]);
+    }
+
+    this.canMoveCells = newCanMoveCells;
+  }
+
   // TODO: Возможно обьединить drawBackGround и drawFigures
   private drawBackGround() {
     const { x, y } = this.cellCount;
