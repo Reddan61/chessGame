@@ -1,5 +1,9 @@
+import { SIDES } from "@utils/ChessBoard/Figures/Figure";
 import { Cell } from "@utils/ChessBoard/Cell";
 import { Pawn } from "@utils/ChessBoard/Figures/Pawn";
+import { percentFromNumber } from "@utils/Math";
+import { drawTriangle } from "@utils/Canvas";
+import { Horse } from "@utils/ChessBoard/Figures/Horse";
 
 interface Size {
   width: number;
@@ -13,8 +17,8 @@ export class ChessBoard {
   private size: Size;
 
   private cellColor = {
-    primary: "#769656",
-    secondary: "#eeeed2",
+    primary: "#b58863",
+    secondary: "#f0d9b5",
   };
 
   private cellCount = {
@@ -35,8 +39,14 @@ export class ChessBoard {
   private canMoveCells: [x: number, y: number][] = [];
 
   constructor(canvas: ChessBoard["canvas"]) {
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) {
+      throw new Error();
+    }
+
     this.canvas = canvas;
-    this.ctx = canvas.getContext("2d");
+    this.ctx = ctx;
 
     this.init();
   }
@@ -78,19 +88,98 @@ export class ChessBoard {
 
     this.cells = newCells;
   }
-
+  // TODO: исправить это безобразие
   private initFigures() {
     // начальное расстановка фигур и подгрузка их картинок
-    return new Promise((res) => {
-      const cell = this.cells[6][1];
-      const pawn = new Pawn();
+    const promises = [];
+    const { x } = this.cellCount;
 
-      const img = pawn.getImage();
-      img.onload = () => {
-        cell.setFigure(pawn);
-        res(true);
-      };
+    // pawns
+    for (let i = 0; i < x; i++) {
+      const cellWhite = this.cells[1][i];
+      const cellBlack = this.cells[6][i];
+
+      const pawnBlack = new Pawn({
+        side: SIDES.BLACK,
+      });
+      const pawnWhite = new Pawn({
+        side: SIDES.WHITE,
+      });
+
+      promises.push(
+        new Promise((res) => {
+          pawnWhite.getImage().onload = () => {
+            cellWhite.setFigure(pawnWhite);
+            res(true);
+          };
+        })
+      );
+
+      promises.push(
+        new Promise((res) => {
+          pawnBlack.getImage().onload = () => {
+            cellBlack.setFigure(pawnBlack);
+            res(true);
+          };
+        })
+      );
+    }
+
+    // white horses
+    const cellWhiteLeftHorse = this.cells[0][1];
+    const cellWhiteRightHorse = this.cells[0][6];
+    const horseLeftWhite = new Horse({
+      side: SIDES.WHITE,
     });
+    const horseRightWhite = new Horse({
+      side: SIDES.WHITE,
+    });
+
+    promises.push(
+      new Promise((res) => {
+        horseLeftWhite.getImage().onload = () => {
+          cellWhiteLeftHorse.setFigure(horseLeftWhite);
+          res(true);
+        };
+      })
+    );
+    promises.push(
+      new Promise((res) => {
+        horseRightWhite.getImage().onload = () => {
+          cellWhiteRightHorse.setFigure(horseRightWhite);
+          res(true);
+        };
+      })
+    );
+
+    // black horses
+    const cellBlackLeftHorse = this.cells[7][1];
+    const cellBlackRightHorse = this.cells[7][6];
+    const horseLeftBlack = new Horse({
+      side: SIDES.BLACK,
+    });
+    const horseRightBlack = new Horse({
+      side: SIDES.BLACK,
+    });
+
+    promises.push(
+      new Promise((res) => {
+        horseLeftBlack.getImage().onload = () => {
+          cellBlackLeftHorse.setFigure(horseLeftBlack);
+          res(true);
+        };
+      })
+    );
+    promises.push(
+      new Promise((res) => {
+        horseRightBlack.getImage().onload = () => {
+          cellBlackRightHorse.setFigure(horseRightBlack);
+          res(true);
+        };
+      })
+    );
+
+    return Promise.all(promises);
   }
 
   private async init() {
@@ -117,15 +206,14 @@ export class ChessBoard {
         if (mouseX >= startX && mouseX <= endX) {
           if (mouseY >= startY && mouseY <= endY) {
             if (this.selectedCell) {
-              const cellFigure = cell.getFigure();
               const canIMove = !!this.canMoveCells.filter(([moveX, moveY]) => {
-                // TODO: убрать проверку !cellFigure (добавить возможность бить вражеские фигуры)
-                return moveX === x && moveY === y && !cellFigure;
+                return moveX === x && moveY === y;
               }).length;
 
               if (canIMove) {
                 const selectedFigure = this.selectedCell.getFigure();
 
+                selectedFigure?.setMoved();
                 cell.setFigure(selectedFigure);
                 this.selectedCell.setFigure(null);
                 this.selectedCell = null;
@@ -160,13 +248,7 @@ export class ChessBoard {
         const { startX, startY } = cell.getPosition();
         const { height, width } = cell.getSize();
         const img = figure.getImage();
-        // const img = new Image();
         this.ctx.drawImage(img, startX, startY, width, height);
-        // img.onload = () => {
-        //   console.log('da')
-        // };
-
-        // img.src = imageSRC;
       }
     }
   }
@@ -194,14 +276,14 @@ export class ChessBoard {
     const cell = this.selectedCell;
     const figure = cell?.getFigure();
 
-    if (!figure) {
+    if (!figure || !cell) {
       this.canMoveCells = [];
       return;
     }
 
     const { x, y } = cell.getPosition();
-    const directions = figure.getDirections();
 
+    const directions = figure.getDirections(cell, this.cells);
     const newCanMoveCells: ChessBoard["canMoveCells"] = [];
 
     for (let i = 0; i < directions.length; i++) {
@@ -213,29 +295,85 @@ export class ChessBoard {
 
       if (!directionCell) continue;
 
-      const {
-        startX,
-        startY,
-        x: directionCellX,
-        y: directionCellY,
-      } = directionCell.getPosition();
-      const { width, height } = directionCell.getSize();
+      const { x: directionCellX, y: directionCellY } =
+        directionCell.getPosition();
+      const figure = directionCell.getFigure();
 
-      const arcX = startX + width / 2;
-      const arcY = startY + height / 2;
-
-      const { color, radius, endAngle, startAngle } = this.canMoveOptions;
-
-      this.ctx.beginPath();
-      this.ctx.fillStyle = color;
-      this.ctx.arc(arcX, arcY, radius, startAngle, endAngle);
-      this.ctx.fill();
-      this.ctx.closePath();
+      if (figure) {
+        this.drawMoveHightLightWithFigure(directionCell);
+      } else {
+        this.drawMoveHightLight(directionCell);
+      }
 
       newCanMoveCells.push([directionCellX, directionCellY]);
     }
 
     this.canMoveCells = newCanMoveCells;
+  }
+
+  private drawMoveHightLightWithFigure(cell: Cell) {
+    const { color } = this.canMoveOptions;
+    const { width, height } = cell.getSize();
+    const { startX, startY } = cell.getPosition();
+
+    const widthGap = percentFromNumber(width, 20);
+    const heightGap = percentFromNumber(height, 20);
+
+    // top - left
+    drawTriangle(
+      {
+        ctx: this.ctx,
+        color,
+      },
+      [startX, startY],
+      [startX + widthGap, startY],
+      [startX, startY + heightGap]
+    );
+    // top - right
+    drawTriangle(
+      {
+        ctx: this.ctx,
+        color,
+      },
+      [startX + width, startY],
+      [startX + width - widthGap, startY],
+      [startX + width, startY + heightGap]
+    );
+    // bottom - left
+    drawTriangle(
+      {
+        ctx: this.ctx,
+        color,
+      },
+      [startX, startY + height],
+      [startX, startY + height - heightGap],
+      [startX + widthGap, startY + height]
+    );
+    // bottom - right
+    drawTriangle(
+      {
+        ctx: this.ctx,
+        color,
+      },
+      [startX + width, startY + height],
+      [startX + width - widthGap, startY + height],
+      [startX + width, startY + height - heightGap]
+    );
+  }
+
+  private drawMoveHightLight(cell: Cell) {
+    const { color, radius, endAngle, startAngle } = this.canMoveOptions;
+    const { startX, startY } = cell.getPosition();
+    const { width, height } = cell.getSize();
+
+    const arcX = startX + width / 2;
+    const arcY = startY + height / 2;
+
+    this.ctx.beginPath();
+    this.ctx.fillStyle = color;
+    this.ctx.arc(arcX, arcY, radius, startAngle, endAngle);
+    this.ctx.fill();
+    this.ctx.closePath();
   }
 
   // TODO: Возможно обьединить drawBackGround и drawFigures
