@@ -3,7 +3,7 @@ import { BrowserRouter } from "react-router-dom";
 import { App } from "./App";
 import "@styles/reset.scss";
 
-const root = createRoot(document.getElementById("app"));
+const root = createRoot(document.getElementById("app")!);
 
 root.render(
   <BrowserRouter>

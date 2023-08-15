@@ -15,15 +15,15 @@ export class Pawn extends Figure {
     });
   }
 
-  public getDirections(
+  public getAvailableCells(
     myCell: Cell,
     cells: ChessBoard["cells"]
-  ): ReturnType<Figure["getDirections"]> {
+  ): ReturnType<Figure["getAvailableCells"]> {
     const isWhite = this.isWhite();
     const { x: cellX, y: cellY } = myCell.getPosition();
 
     const directionY = isWhite ? 1 : -1;
-    const directions: ReturnType<Figure["getDirections"]> = [];
+    const availableCells: ReturnType<Figure["getAvailableCells"]> = [];
 
     const singleInFrontCell = cells[cellY + directionY]?.[cellX];
     const doubleInFrontCell = cells[cellY + directionY * 2]?.[cellX];
@@ -39,11 +39,26 @@ export class Pawn extends Figure {
       !!diagonalLeftCell?.getFigure() &&
       !diagonalLeftCell?.getFigure()?.sameSide(this.side);
 
-    if (canGoFrontSingle) directions.push([0, directionY]);
-    if (canGoFrontDouble) directions.push([0, directionY * 2]);
-    if (canGoDiagonalRight) directions.push([1, directionY]);
-    if (canGoDiagonalLeft) directions.push([-1, directionY]);
+    if (canGoFrontSingle) {
+      const { x, y } = singleInFrontCell.getPosition();
+      availableCells.push([x, y]);
+    }
+    if (canGoFrontDouble) {
+      const { x, y } = doubleInFrontCell.getPosition();
 
-    return directions;
+      availableCells.push([x, y]);
+    }
+    if (canGoDiagonalRight) {
+      const { x, y } = diagonalRightCell.getPosition();
+
+      availableCells.push([x, y]);
+    }
+    if (canGoDiagonalLeft) {
+      const { x, y } = diagonalLeftCell.getPosition();
+
+      availableCells.push([x, y]);
+    }
+
+    return availableCells;
   }
 }
