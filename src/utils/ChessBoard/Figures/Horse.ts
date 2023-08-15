@@ -15,11 +15,11 @@ export class Horse extends Figure {
     });
   }
 
-  public getDirections(
+  public getAvailableCells(
     myCell: Cell,
     cells: Cell[][]
-  ): ReturnType<Figure["getDirections"]> {
-    const directions: ReturnType<Figure["getDirections"]> = [
+  ): ReturnType<Figure["getAvailableCells"]> {
+    const directions = [
       [1, 2],
       [-1, 2],
       [2, 1],
@@ -31,19 +31,28 @@ export class Horse extends Figure {
     ];
 
     const { x: myCellX, y: myCellY } = myCell.getPosition();
+    const availbleCells: ReturnType<Figure["getAvailableCells"]> = [];
 
-    return directions.filter(([dirX, dirY]) => {
+    directions.forEach(([dirX, dirY]) => {
       const cell = cells[myCellY + dirY]?.[myCellX + dirX];
 
-      if (!cell) return false;
+      if (!cell) return;
 
+      const { x, y } = cell.getPosition();
       const figure = cell.getFigure();
 
-      if (!figure) return true;
+      if (!figure) {
+        availbleCells.push([x, y]);
+        return;
+      }
 
       const isSameSide = figure?.sameSide(this.side);
 
-      return !isSameSide;
+      if (!isSameSide) {
+        availbleCells.push([x, y]);
+      }
     });
+
+    return availbleCells;
   }
 }

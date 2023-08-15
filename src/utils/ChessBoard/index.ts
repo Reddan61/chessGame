@@ -1,14 +1,21 @@
-import { SIDES } from "@utils/ChessBoard/Figures/Figure";
 import { Cell } from "@utils/ChessBoard/Cell";
-import { Pawn } from "@utils/ChessBoard/Figures/Pawn";
 import { percentFromNumber } from "@utils/Math";
 import { drawTriangle } from "@utils/Canvas";
-import { Horse } from "@utils/ChessBoard/Figures/Horse";
+import { Figures, FiguresConfig } from "@utils/ChessBoard/Config";
+import { Pawn, Bishop, Horse, Rook, Queen } from "@utils/ChessBoard/Figures";
 
 interface Size {
   width: number;
   height: number;
 }
+
+const FiguresConstructors = {
+  [Figures.PAWN]: Pawn,
+  [Figures.HORSE]: Horse,
+  [Figures.BISHOP]: Bishop,
+  [Figures.ROOK]: Rook,
+  [Figures.QUEEN]: Queen,
+} as const;
 
 export class ChessBoard {
   private canvas: HTMLCanvasElement;
@@ -88,96 +95,29 @@ export class ChessBoard {
 
     this.cells = newCells;
   }
-  // TODO: исправить это безобразие
+
   private initFigures() {
     // начальное расстановка фигур и подгрузка их картинок
+    const config = FiguresConfig;
     const promises = [];
-    const { x } = this.cellCount;
 
-    // pawns
-    for (let i = 0; i < x; i++) {
-      const cellWhite = this.cells[1][i];
-      const cellBlack = this.cells[6][i];
+    for (let i = 0; i < config.length; i++) {
+      const { coords, figure, side } = config[i];
+      const cell = this.cells[coords[1]][coords[0]];
 
-      const pawnBlack = new Pawn({
-        side: SIDES.BLACK,
-      });
-      const pawnWhite = new Pawn({
-        side: SIDES.WHITE,
+      const Figure = new FiguresConstructors[figure]({
+        side,
       });
 
       promises.push(
         new Promise((res) => {
-          pawnWhite.getImage().onload = () => {
-            cellWhite.setFigure(pawnWhite);
-            res(true);
-          };
-        })
-      );
-
-      promises.push(
-        new Promise((res) => {
-          pawnBlack.getImage().onload = () => {
-            cellBlack.setFigure(pawnBlack);
+          Figure.getImage().onload = () => {
+            cell.setFigure(Figure);
             res(true);
           };
         })
       );
     }
-
-    // white horses
-    const cellWhiteLeftHorse = this.cells[0][1];
-    const cellWhiteRightHorse = this.cells[0][6];
-    const horseLeftWhite = new Horse({
-      side: SIDES.WHITE,
-    });
-    const horseRightWhite = new Horse({
-      side: SIDES.WHITE,
-    });
-
-    promises.push(
-      new Promise((res) => {
-        horseLeftWhite.getImage().onload = () => {
-          cellWhiteLeftHorse.setFigure(horseLeftWhite);
-          res(true);
-        };
-      })
-    );
-    promises.push(
-      new Promise((res) => {
-        horseRightWhite.getImage().onload = () => {
-          cellWhiteRightHorse.setFigure(horseRightWhite);
-          res(true);
-        };
-      })
-    );
-
-    // black horses
-    const cellBlackLeftHorse = this.cells[7][1];
-    const cellBlackRightHorse = this.cells[7][6];
-    const horseLeftBlack = new Horse({
-      side: SIDES.BLACK,
-    });
-    const horseRightBlack = new Horse({
-      side: SIDES.BLACK,
-    });
-
-    promises.push(
-      new Promise((res) => {
-        horseLeftBlack.getImage().onload = () => {
-          cellBlackLeftHorse.setFigure(horseLeftBlack);
-          res(true);
-        };
-      })
-    );
-    promises.push(
-      new Promise((res) => {
-        horseRightBlack.getImage().onload = () => {
-          cellBlackRightHorse.setFigure(horseRightBlack);
-          res(true);
-        };
-      })
-    );
 
     return Promise.all(promises);
   }
@@ -281,31 +221,27 @@ export class ChessBoard {
       return;
     }
 
-    const { x, y } = cell.getPosition();
-
-    const directions = figure.getDirections(cell, this.cells);
+    const availableCells = figure.getAvailableCells(cell, this.cells);
     const newCanMoveCells: ChessBoard["canMoveCells"] = [];
 
-    for (let i = 0; i < directions.length; i++) {
-      const [directionX, directionY] = directions[i];
+    for (let i = 0; i < availableCells.length; i++) {
+      const [x, y] = availableCells[i];
 
-      const newX = x + directionX;
-      const newY = y + directionY;
-      const directionCell = this.cells[newY]?.[newX];
+      const availableCell = this.cells[y]?.[x];
 
-      if (!directionCell) continue;
+      if (!availableCell) continue;
 
-      const { x: directionCellX, y: directionCellY } =
-        directionCell.getPosition();
-      const figure = directionCell.getFigure();
+      const { x: availableCellX, y: availableCellY } =
+        availableCell.getPosition();
+      const figure = availableCell.getFigure();
 
       if (figure) {
-        this.drawMoveHightLightWithFigure(directionCell);
+        this.drawMoveHightLightWithFigure(availableCell);
       } else {
-        this.drawMoveHightLight(directionCell);
+        this.drawMoveHightLight(availableCell);
       }
 
-      newCanMoveCells.push([directionCellX, directionCellY]);
+      newCanMoveCells.push([availableCellX, availableCellY]);
     }
 
     this.canMoveCells = newCanMoveCells;

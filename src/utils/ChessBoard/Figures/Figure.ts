@@ -30,7 +30,45 @@ export class Figure {
     return this.image;
   }
 
-  public getDirections(myCell: Cell, cells: ChessBoard["cells"]): Directions {
+  // Получение ВСЕХ доступных клеток по НАПРАВЛЕНИЮ
+  protected getCellsByDirection(
+    direction: [x: number, y: number],
+    cell: Cell | null,
+    cells: ChessBoard["cells"]
+  ): ReturnType<Figure["getAvailableCells"]> {
+    if (!cell) return [];
+
+    const { x, y } = cell.getPosition();
+    const figure = cell.getFigure();
+
+    if (!figure) {
+      const newX = x + direction[0];
+      const newY = y + direction[1];
+
+      return [
+        [x, y],
+        ...this.getCellsByDirection(
+          direction,
+          cells[newY]?.[newX] ?? null,
+          cells
+        ),
+      ];
+    }
+
+    const isSameSide = figure.sameSide(this.side);
+
+    if (isSameSide) {
+      return [];
+    }
+
+    return [[x, y]];
+  }
+
+  // получение координат доступных клеток для хода
+  public getAvailableCells(
+    myCell: Cell,
+    cells: ChessBoard["cells"]
+  ): Directions {
     return [];
   }
 
@@ -42,7 +80,7 @@ export class Figure {
     this.isMoved = true;
   }
 
-  public sameSide(side: Figure['side']) {
-    return side === this.side
+  public sameSide(side: Figure["side"]) {
+    return side === this.side;
   }
 }
