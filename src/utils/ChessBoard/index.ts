@@ -2,7 +2,14 @@ import { Cell } from "@utils/ChessBoard/Cell";
 import { percentFromNumber } from "@utils/Math";
 import { drawTriangle } from "@utils/Canvas";
 import { Figures, FiguresConfig } from "@utils/ChessBoard/Config";
-import { Pawn, Bishop, Horse, Rook, Queen } from "@utils/ChessBoard/Figures";
+import {
+  Pawn,
+  Bishop,
+  Horse,
+  Rook,
+  Queen,
+  King,
+} from "@utils/ChessBoard/Figures";
 
 interface Size {
   width: number;
@@ -15,6 +22,7 @@ const FiguresConstructors = {
   [Figures.BISHOP]: Bishop,
   [Figures.ROOK]: Rook,
   [Figures.QUEEN]: Queen,
+  [Figures.KING]: King,
 } as const;
 
 export class ChessBoard {
@@ -44,6 +52,13 @@ export class ChessBoard {
   private cells: Cell[][] = [];
   private selectedCell: Cell | null = null;
   private canMoveCells: [x: number, y: number][] = [];
+  private check: {
+    needToBlockCells: Cell[];
+    kingCell: Cell | null;
+  } = {
+    needToBlockCells: [],
+    kingCell: null,
+  };
 
   constructor(canvas: ChessBoard["canvas"]) {
     const ctx = canvas.getContext("2d");
@@ -93,6 +108,7 @@ export class ChessBoard {
       }
     }
 
+    // this.targetCells = newTarget;
     this.cells = newCells;
   }
 
@@ -193,6 +209,38 @@ export class ChessBoard {
     }
   }
 
+  // проверка на шах
+  private getCheck() {
+    const check: ChessBoard["check"] = {
+      kingCell: null,
+      needToBlockCells: [],
+    };
+
+    for (let i = 0; i < this.cells.length; i++) {
+      for (let j = 0; j < this.cells[i].length; j++) {
+        const cell = this.cells[i][j];
+
+        const figure = cell.getFigure();
+
+        if (!figure) continue;
+
+        const { kingCell: kingCellCoords, cellsToKing } =
+          figure.getAvailableCells(cell, this.cells);
+
+        if (!check.kingCell && kingCellCoords) {
+          const [x, y] = kingCellCoords;
+          const kingCell = this.cells[y][x];
+          check.needToBlockCells = cellsToKing.map(([x, y]) => {
+            return this.cells[y][x];
+          });
+          check.kingCell = kingCell;
+        }
+      }
+    }
+
+    this.check = check;
+  }
+
   private normalizeSize() {
     const { offsetHeight, offsetWidth } = this.canvas;
 
@@ -206,6 +254,7 @@ export class ChessBoard {
   }
 
   private update() {
+    this.getCheck();
     this.drawBackGround();
     this.drawFigures();
     this.drawDirections();
@@ -221,25 +270,37 @@ export class ChessBoard {
       return;
     }
 
-    const availableCells = figure.getAvailableCells(cell, this.cells);
+    const { beat, move } = figure.getAvailableCells(cell, this.cells);
+
     const newCanMoveCells: ChessBoard["canMoveCells"] = [];
 
-    for (let i = 0; i < availableCells.length; i++) {
-      const [x, y] = availableCells[i];
+    for (let i = 0; i < move.length; i++) {
+      const [x, y] = move[i];
 
-      const availableCell = this.cells[y]?.[x];
+      const moveCell = this.cells[y]?.[x];
 
-      if (!availableCell) continue;
+      if (!moveCell) continue;
 
-      const { x: availableCellX, y: availableCellY } =
-        availableCell.getPosition();
-      const figure = availableCell.getFigure();
+      const { x: availableCellX, y: availableCellY } = moveCell.getPosition();
 
-      if (figure) {
-        this.drawMoveHightLightWithFigure(availableCell);
-      } else {
-        this.drawMoveHightLight(availableCell);
-      }
+      this.drawMoveHightLight(moveCell);
+
+      newCanMoveCells.push([availableCellX, availableCellY]);
+    }
+
+    for (let i = 0; i < beat.length; i++) {
+      const [x, y] = beat[i];
+
+      const beatCell = this.cells[y]?.[x];
+
+      if (!beatCell) continue;
+
+      const { x: availableCellX, y: availableCellY } = beatCell.getPosition();
+      const figure = beatCell.getFigure();
+
+      if (!figure) continue;
+
+      this.drawMoveHightLightWithFigure(beatCell);
 
       newCanMoveCells.push([availableCellX, availableCellY]);
     }

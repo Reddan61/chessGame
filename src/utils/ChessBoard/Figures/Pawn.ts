@@ -23,41 +23,56 @@ export class Pawn extends Figure {
     const { x: cellX, y: cellY } = myCell.getPosition();
 
     const directionY = isWhite ? 1 : -1;
-    const availableCells: ReturnType<Figure["getAvailableCells"]> = [];
+    const availableCells: ReturnType<Figure["getAvailableCells"]> = {
+      beat: [],
+      move: [],
+      kingCell: null,
+      cellsToKing: []
+    };
+
+    const directionsDiagonal = [
+      [1, directionY],
+      [-1, directionY],
+    ];
 
     const singleInFrontCell = cells[cellY + directionY]?.[cellX];
     const doubleInFrontCell = cells[cellY + directionY * 2]?.[cellX];
-    const diagonalRightCell = cells[cellY + directionY]?.[cellX + 1];
-    const diagonalLeftCell = cells[cellY + directionY]?.[cellX - 1];
-    const canGoFrontSingle = !singleInFrontCell?.getFigure();
+    const canGoFrontSingle = singleInFrontCell && !singleInFrontCell?.getFigure();
     const canGoFrontDouble =
       canGoFrontSingle && !doubleInFrontCell?.getFigure() && !this.isMoved;
-    const canGoDiagonalRight =
-      !!diagonalRightCell?.getFigure() &&
-      !diagonalRightCell?.getFigure()?.sameSide(this.side);
-    const canGoDiagonalLeft =
-      !!diagonalLeftCell?.getFigure() &&
-      !diagonalLeftCell?.getFigure()?.sameSide(this.side);
+
 
     if (canGoFrontSingle) {
       const { x, y } = singleInFrontCell.getPosition();
-      availableCells.push([x, y]);
+      availableCells.move.push([x, y]);
     }
     if (canGoFrontDouble) {
       const { x, y } = doubleInFrontCell.getPosition();
 
-      availableCells.push([x, y]);
+      availableCells.move.push([x, y]);
     }
-    if (canGoDiagonalRight) {
-      const { x, y } = diagonalRightCell.getPosition();
 
-      availableCells.push([x, y]);
-    }
-    if (canGoDiagonalLeft) {
-      const { x, y } = diagonalLeftCell.getPosition();
+    directionsDiagonal.forEach(([directionX, directionY]) => {
+      const cell = cells[cellY + directionY]?.[cellX + directionX];
 
-      availableCells.push([x, y]);
-    }
+      if (!cell) return;
+
+      const figure = cell.getFigure();
+
+      if (!figure) return;
+
+      const { x, y } = cell.getPosition();
+      const sameSide = figure.sameSide(this.side);
+      const isKing = !figure.canBeat();
+
+      if (!sameSide) {
+        if (isKing) {
+          availableCells.kingCell = [x, y];
+        } else {
+          availableCells.beat.push([x, y]);
+        }
+      }
+    });
 
     return availableCells;
   }

@@ -26,7 +26,12 @@ export class Rook extends Figure {
       [0, -1],
     ];
 
-    const availableCells: ReturnType<Figure["getAvailableCells"]> = [];
+    const availableCells: ReturnType<Figure["getAvailableCells"]> = {
+      beat: [],
+      move: [],
+      kingCell: null,
+      cellsToKing: [],
+    };
 
     const { x, y } = myCell.getPosition();
 
@@ -36,7 +41,13 @@ export class Rook extends Figure {
       const dirY = y + direction[1];
       const cell = cells[dirY]?.[dirX] ?? null;
 
-      availableCells.push(...this.getCellsByDirection(direction, cell, cells));
+      const result = this.getCellsByDirection(direction, cell, cells);
+      availableCells.move.push(...result.move);
+      availableCells.beat.push(...result.beat);
+      if (!availableCells.kingCell) {
+        availableCells.kingCell = result.kingCell;
+        availableCells.cellsToKing = result.move;
+      }
     }
 
     return availableCells;
