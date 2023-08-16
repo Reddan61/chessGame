@@ -1,18 +1,22 @@
-import BishopWhiteSVG from "@svg/BishopWhite.svg";
-import BishopBlackSVG from "@svg/BishopBlack.svg";
+import KingWhiteSVG from "@svg/KingWhite.svg";
+import KingBlackSVG from "@svg/KingBlack.svg";
 import { Figure, SIDES } from "@utils/ChessBoard/Figures/Figure";
 import { Cell } from "@src/utils/ChessBoard/Cell";
 
 type Payload = Omit<ConstructorParameters<typeof Figure>["0"], "image">;
 
-export class Bishop extends Figure {
+export class King extends Figure {
   constructor({ side }: Payload) {
-    const bishop = side === SIDES.WHITE ? BishopWhiteSVG : BishopBlackSVG;
+    const king = side === SIDES.WHITE ? KingWhiteSVG : KingBlackSVG;
 
     super({
-      image: bishop,
+      image: king,
       side,
     });
+  }
+
+  public canBeat(): ReturnType<Figure["canBeat"]> {
+    return false;
   }
 
   public getAvailableCells(
@@ -24,13 +28,17 @@ export class Bishop extends Figure {
       [1, -1],
       [-1, 1],
       [1, 1],
+      [-1, 0],
+      [1, 0],
+      [0, 1],
+      [0, -1],
     ];
 
     const availableCells: ReturnType<Figure["getAvailableCells"]> = {
       beat: [],
       move: [],
       kingCell: null,
-      cellsToKing: []
+      cellsToKing: [],
     };
 
     const { x, y } = myCell.getPosition();
@@ -41,12 +49,20 @@ export class Bishop extends Figure {
       const dirY = y + direction[1];
       const cell = cells[dirY]?.[dirX] ?? null;
 
-      const result = this.getCellsByDirection(direction, cell, cells);
-      availableCells.move.push(...result.move);
-      availableCells.beat.push(...result.beat);
-      if (!availableCells.kingCell) {
-        availableCells.kingCell = result.kingCell
-        availableCells.cellsToKing = result.move
+      if (!cell) continue;
+
+      const figure = cell.getFigure();
+
+      if (!figure) {
+        availableCells.move.push([dirX, dirY]);
+        continue;
+      }
+
+      const isSameSide = figure.sameSide(this.side);
+
+      if (!isSameSide) {
+        availableCells.beat.push([dirX, dirY]);
+        continue;
       }
     }
 

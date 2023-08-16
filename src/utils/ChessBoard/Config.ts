@@ -6,6 +6,7 @@ export enum Figures {
   BISHOP = "BISHOP",
   ROOK = "ROOK",
   QUEEN = "QUEEN",
+  KING = "KING"
 }
 
 type InitFiguresConfig = {
@@ -194,6 +195,22 @@ const BlackQueensConfig: InitFiguresConfig = [
   },
 ];
 
+const WhiteKingsConfig: InitFiguresConfig = [
+  {
+    coords: [3, 0],
+    figure: Figures.KING,
+    side: SIDES.WHITE,
+  },
+];
+
+const BlackKingsConfig: InitFiguresConfig = [
+  {
+    coords: [3, 7],
+    figure: Figures.KING,
+    side: SIDES.BLACK,
+  },
+];
+
 export const FiguresConfig: InitFiguresConfig = [
   ...WhitePawnConfig,
   ...BlackPawnConfig,
@@ -205,4 +222,6 @@ export const FiguresConfig: InitFiguresConfig = [
   ...BlackRooksConfig,
   ...WhiteQueensConfig,
   ...BlackQueensConfig,
+  ...WhiteKingsConfig,
+  ...BlackKingsConfig,
 ];
