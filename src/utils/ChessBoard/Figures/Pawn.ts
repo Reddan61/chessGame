@@ -26,8 +26,6 @@ export class Pawn extends Figure {
     const availableCells: ReturnType<Figure["getAvailableCells"]> = {
       beat: [],
       move: [],
-      kingCell: null,
-      cellsToKing: []
     };
 
     const directionsDiagonal = [
@@ -37,19 +35,21 @@ export class Pawn extends Figure {
 
     const singleInFrontCell = cells[cellY + directionY]?.[cellX];
     const doubleInFrontCell = cells[cellY + directionY * 2]?.[cellX];
-    const canGoFrontSingle = singleInFrontCell && !singleInFrontCell?.getFigure();
+    const canGoFrontSingle =
+      singleInFrontCell && !singleInFrontCell?.getFigure();
     const canGoFrontDouble =
       canGoFrontSingle && !doubleInFrontCell?.getFigure() && !this.isMoved;
 
+    const frontMove: [x: number, y: number][] = [];
 
     if (canGoFrontSingle) {
       const { x, y } = singleInFrontCell.getPosition();
-      availableCells.move.push([x, y]);
+      frontMove.push([x, y]);
     }
     if (canGoFrontDouble) {
       const { x, y } = doubleInFrontCell.getPosition();
 
-      availableCells.move.push([x, y]);
+      frontMove.push([x, y]);
     }
 
     directionsDiagonal.forEach(([directionX, directionY]) => {
@@ -57,22 +57,11 @@ export class Pawn extends Figure {
 
       if (!cell) return;
 
-      const figure = cell.getFigure();
-
-      if (!figure) return;
-
       const { x, y } = cell.getPosition();
-      const sameSide = figure.sameSide(this.side);
-      const isKing = !figure.canBeat();
-
-      if (!sameSide) {
-        if (isKing) {
-          availableCells.kingCell = [x, y];
-        } else {
-          availableCells.beat.push([x, y]);
-        }
-      }
+      availableCells.beat.push([[x, y]]);
     });
+
+    availableCells.move.push(frontMove);
 
     return availableCells;
   }

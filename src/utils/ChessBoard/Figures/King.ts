@@ -37,8 +37,6 @@ export class King extends Figure {
     const availableCells: ReturnType<Figure["getAvailableCells"]> = {
       beat: [],
       move: [],
-      kingCell: null,
-      cellsToKing: [],
     };
 
     const { x, y } = myCell.getPosition();
@@ -51,19 +49,8 @@ export class King extends Figure {
 
       if (!cell) continue;
 
-      const figure = cell.getFigure();
-
-      if (!figure) {
-        availableCells.move.push([dirX, dirY]);
-        continue;
-      }
-
-      const isSameSide = figure.sameSide(this.side);
-
-      if (!isSameSide) {
-        availableCells.beat.push([dirX, dirY]);
-        continue;
-      }
+      availableCells.move.push([[dirX, dirY]]);
+      availableCells.beat.push([[dirX, dirY]]);
     }
 
     return availableCells;
