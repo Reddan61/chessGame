@@ -53,12 +53,10 @@ export class ChessBoard {
   private selectedCell: Cell | null = null;
   private canMoveCells: [x: number, y: number][] = [];
   private check: {
-    needToBlockCells: Cell[];
-    kingCell: Cell | null;
-  } = {
-    needToBlockCells: [],
-    kingCell: null,
-  };
+    kingCell: Cell;
+    checkCell: Cell;
+  } | null = null;
+  private cellTargets: Record<number, Record<number, Cell[]>> = {};
 
   constructor(canvas: ChessBoard["canvas"]) {
     const ctx = canvas.getContext("2d");
@@ -211,12 +209,9 @@ export class ChessBoard {
 
   // проверка на шах
   private getCheck() {
-    const check: ChessBoard["check"] = {
-      kingCell: null,
-      needToBlockCells: [],
-    };
+    let check = null as ChessBoard["check"];
 
-    for (let i = 0; i < this.cells.length; i++) {
+    yFor: for (let i = 0; i < this.cells.length; i++) {
       for (let j = 0; j < this.cells[i].length; j++) {
         const cell = this.cells[i][j];
 
@@ -224,21 +219,37 @@ export class ChessBoard {
 
         if (!figure) continue;
 
-        const { kingCell: kingCellCoords, cellsToKing } =
-          figure.getAvailableCells(cell, this.cells);
+        const { beat: notFilteredBeat } = figure.getAvailableCells(
+          cell,
+          this.cells
+        );
 
-        if (!check.kingCell && kingCellCoords) {
-          const [x, y] = kingCellCoords;
-          const kingCell = this.cells[y][x];
-          check.needToBlockCells = cellsToKing.map(([x, y]) => {
-            return this.cells[y][x];
-          });
-          check.kingCell = kingCell;
+        const beat = this.filterBeatCells(cell, notFilteredBeat);
+
+        for (let k = 0; k < beat.length; k++) {
+          const [x, y] = beat[k];
+          const potentialCell = this.cells[y][x];
+
+          const figure = potentialCell.getFigure();
+
+          if (!figure) return false;
+
+          const isKing = !figure.canBeat();
+
+          if (isKing) {
+            check = {
+              checkCell: cell,
+              kingCell: potentialCell,
+            };
+            break yFor;
+          }
         }
       }
     }
 
     this.check = check;
+
+    return !!check;
   }
 
   private normalizeSize() {
@@ -254,11 +265,214 @@ export class ChessBoard {
   }
 
   private update() {
+    this.getTargets();
     this.getCheck();
     this.drawBackGround();
     this.drawFigures();
     this.drawDirections();
     console.log(this);
+  }
+  // открытые клетки для хода во время шаха
+  // private filterMovesWhileCheck(
+  //   move: [X: number, y: number][],
+  //   beat: [X: number, y: number][]
+  // ): {
+  //   move: [X: number, y: number][];
+  //   beat: [X: number, y: number][];
+  // } {
+  //   const check = this.check;
+
+  //   if (!check)
+  //     return {
+  //       move,
+  //       beat,
+  //     };
+
+  //   const { checkCell } = check;
+  //   const { x, y } = checkCell.getPosition();
+
+  //   const newMoves = move.filter(([moveX, moveY]) => {
+  //     const found = check.needToBlockCells.find((cell) => {
+  //       const { x, y } = cell.getPosition();
+
+  //       return moveX === x && moveY === y;
+  //     });
+
+  //     return !!found;
+  //   });
+
+  //   const newBeat = beat.filter(([beatX, beatY]) => {
+  //     return beatX === x && beatY === y;
+  //   });
+
+  //   return {
+  //     beat: newBeat,
+  //     move: newMoves,
+  //   };
+  // }
+
+  private filterMoveCells(
+    cell: Cell,
+    move: [x: number, y: number][][]
+  ): [x: number, y: number][] {
+    const result: [x: number, y: number][] = [];
+
+    const myCellFigure = cell.getFigure();
+
+    if (!myCellFigure) return result;
+
+    for (let i = 0; i < move.length; i++) {
+      for (let j = 0; j < move[i].length; j++) {
+        const [x, y] = move[i][j];
+        const cell = this.cells[y][x];
+
+        const figure = cell.getFigure();
+
+        if (!figure) {
+          result.push([x, y]);
+          continue;
+        }
+
+        break;
+      }
+    }
+
+    return result;
+  }
+
+  private filterBeatCells(
+    cell: Cell,
+    beat: [x: number, y: number][][],
+    priority?: [x: number, y: number]
+  ): [x: number, y: number][] {
+    const result: [x: number, y: number][] = [];
+
+    const myCellFigure = cell.getFigure();
+
+    if (!myCellFigure) return result;
+
+    const mySide = myCellFigure.getSide();
+
+    for (let i = 0; i < beat.length; i++) {
+      for (let j = 0; j < beat[i].length; j++) {
+        const [x, y] = beat[i][j];
+        const cell = this.cells[y][x];
+
+        const figure = cell.getFigure();
+
+        if (!figure) {
+          continue;
+        }
+
+        const sameSide = figure.sameSide(mySide);
+
+        if (sameSide) {
+          break;
+        }
+
+        if (priority) {
+          const [priorityX, priorityY] = priority;
+
+          if (priorityX === x && priorityY === y) {
+            result.push([x, y]);
+          }
+        } else {
+          result.push([x, y]);
+        }
+
+        break;
+      }
+    }
+
+    return result;
+  }
+
+  private getTargets() {
+    const result: ChessBoard["cellTargets"] = {};
+
+    for (let i = 0; i < this.cells.length; i++) {
+      for (let j = 0; j < this.cells[i].length; j++) {
+        const cell = this.cells[i][j];
+
+        const figure = cell.getFigure();
+
+        if (!figure) continue;
+
+        const { beat: notFilteredBeat } = figure.getAvailableCells(
+          cell,
+          this.cells
+        );
+
+        const beat = this.filterBeatCells(cell, notFilteredBeat);
+
+        beat.forEach(([x, y]) => {
+          result[x] = {
+            ...result[x],
+            [y]: [...(result[x]?.[y] ?? []), cell],
+          };
+        });
+      }
+    }
+
+    this.cellTargets = result;
+  }
+
+  // получение фигур, которые сделают шах, если убрать текущую фигуру
+  private getCheckBySources(cell: Cell, sources: Cell[]) {
+    const { x, y } = cell.getPosition();
+    const figure = cell.getFigure();
+
+    if (!figure) return [];
+
+    const result: Cell[] = [];
+
+    for (let i = 0; i < sources.length; i++) {
+      const source = sources[i];
+
+      const figure = source.getFigure();
+
+      if (!figure) continue;
+
+      const { beat } = figure.getAvailableCells(source, this.cells);
+      // нашли текущую фигуру
+      let hasCurrentCell = false;
+
+      for (let j = 0; j < beat.length; j++) {
+        const direction = beat[j];
+
+        for (let k = 0; k < direction.length; k++) {
+          const beatPosition = direction[k];
+
+          const isCurrentCell = x === beatPosition[0] && y === beatPosition[1];
+
+          if (isCurrentCell) {
+            hasCurrentCell = true;
+            continue;
+          }
+
+          if (hasCurrentCell) {
+            const beatCell = this.cells[beatPosition[1]][beatPosition[0]];
+
+            const beatFigure = beatCell.getFigure();
+
+            if (!beatFigure) continue;
+
+            const beatSide = beatFigure.getSide();
+            const sameSide = figure.sameSide(beatSide);
+            const isKing = !beatFigure.canBeat();
+
+            if (!sameSide && isKing) {
+              result.push(source);
+              break;
+            }
+
+            break;
+          }
+        }
+      }
+    }
+
+    return result;
   }
 
   private drawDirections() {
@@ -270,7 +484,33 @@ export class ChessBoard {
       return;
     }
 
-    const { beat, move } = figure.getAvailableCells(cell, this.cells);
+    const { x, y } = cell.getPosition();
+
+    const { beat: beatNotFiltered, move: moveNotFiltred } =
+      figure.getAvailableCells(cell, this.cells);
+
+    const mySources = this.cellTargets[x]?.[y];
+    const hasSources = !!mySources?.length;
+    let priorityToBeat: [x: number, y: number] | null = null;
+
+    if (hasSources) {
+      const cellsWhoWillCheck = this.getCheckBySources(cell, mySources);
+      console.log(cellsWhoWillCheck);
+      if (cellsWhoWillCheck.length > 1) return;
+
+      if (cellsWhoWillCheck.length) {
+        const { x, y } = cellsWhoWillCheck[0].getPosition();
+
+        priorityToBeat = [x, y];
+      }
+    }
+
+    const move = this.filterMoveCells(cell, moveNotFiltred);
+    const beat = this.filterBeatCells(
+      cell,
+      beatNotFiltered,
+      priorityToBeat ?? undefined
+    );
 
     const newCanMoveCells: ChessBoard["canMoveCells"] = [];
 

@@ -33,9 +33,7 @@ export class Horse extends Figure {
     const { x: myCellX, y: myCellY } = myCell.getPosition();
     const availbleCells: ReturnType<Figure["getAvailableCells"]> = {
       beat: [],
-      move: [],
-      kingCell: null,
-      cellsToKing: [],
+      move: []
     };
 
     directions.forEach(([dirX, dirY]) => {
@@ -44,23 +42,9 @@ export class Horse extends Figure {
       if (!cell) return;
 
       const { x, y } = cell.getPosition();
-      const figure = cell.getFigure();
 
-      if (!figure) {
-        availbleCells.move.push([x, y]);
-        return;
-      }
-
-      const isKing = !figure.canBeat();
-      const isSameSide = figure.sameSide(this.side);
-
-      if (!isSameSide) {
-        if (isKing) {
-          availbleCells.kingCell = [x, y];
-        } else {
-          availbleCells.beat.push([x, y]);
-        }
-      }
+      availbleCells.move.push([[x, y]]);
+      availbleCells.beat.push([[x, y]]);
     });
 
     return availbleCells;

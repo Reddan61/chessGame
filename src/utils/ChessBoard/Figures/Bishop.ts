@@ -29,8 +29,6 @@ export class Bishop extends Figure {
     const availableCells: ReturnType<Figure["getAvailableCells"]> = {
       beat: [],
       move: [],
-      kingCell: null,
-      cellsToKing: []
     };
 
     const { x, y } = myCell.getPosition();
@@ -42,12 +40,9 @@ export class Bishop extends Figure {
       const cell = cells[dirY]?.[dirX] ?? null;
 
       const result = this.getCellsByDirection(direction, cell, cells);
-      availableCells.move.push(...result.move);
-      availableCells.beat.push(...result.beat);
-      if (!availableCells.kingCell) {
-        availableCells.kingCell = result.kingCell
-        availableCells.cellsToKing = result.move
-      }
+      
+      availableCells.move.push([...result]);
+      availableCells.beat.push([...result]);
     }
 
     return availableCells;
