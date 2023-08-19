@@ -29,6 +29,7 @@ export class Bishop extends Figure {
     const availableCells: ReturnType<Figure["getAvailableCells"]> = {
       beat: [],
       move: [],
+      castling: []
     };
 
     const { x, y } = myCell.getPosition();
@@ -40,7 +41,7 @@ export class Bishop extends Figure {
       const cell = cells[dirY]?.[dirX] ?? null;
 
       const result = this.getCellsByDirection(direction, cell, cells);
-      
+
       availableCells.move.push([...result]);
       availableCells.beat.push([...result]);
     }
@@ -48,3 +49,7 @@ export class Bishop extends Figure {
     return availableCells;
   }
 }
+
+export const IsBishop = (figure: Figure) => {
+  return figure instanceof Bishop;
+};

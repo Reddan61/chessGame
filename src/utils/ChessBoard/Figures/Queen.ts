@@ -32,8 +32,9 @@ export class Queen extends Figure {
 
     const availableCells: ReturnType<Figure["getAvailableCells"]> = {
       beat: [],
-      move: []
-    }
+      move: [],
+      castling: [],
+    };
 
     const { x, y } = myCell.getPosition();
 
@@ -45,8 +46,8 @@ export class Queen extends Figure {
 
       const result = this.getCellsByDirection(direction, cell, cells);
 
-      availableCells.move.push([...result])
-      availableCells.beat.push([...result])
+      availableCells.move.push([...result]);
+      availableCells.beat.push([...result]);
     }
 
     return availableCells;

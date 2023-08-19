@@ -29,6 +29,7 @@ export class Rook extends Figure {
     const availableCells: ReturnType<Figure["getAvailableCells"]> = {
       beat: [],
       move: [],
+      castling: []
     };
 
     const { x, y } = myCell.getPosition();
@@ -46,4 +47,8 @@ export class Rook extends Figure {
 
     return availableCells;
   }
+}
+
+export const IsRook = (figure: Figure) => {
+  return figure instanceof Rook
 }

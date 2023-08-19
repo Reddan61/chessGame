@@ -26,6 +26,7 @@ export class Pawn extends Figure {
     const availableCells: ReturnType<Figure["getAvailableCells"]> = {
       beat: [],
       move: [],
+      castling: []
     };
 
     const directionsDiagonal = [

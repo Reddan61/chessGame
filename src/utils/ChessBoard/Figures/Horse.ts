@@ -33,7 +33,8 @@ export class Horse extends Figure {
     const { x: myCellX, y: myCellY } = myCell.getPosition();
     const availbleCells: ReturnType<Figure["getAvailableCells"]> = {
       beat: [],
-      move: []
+      move: [],
+      castling: []
     };
 
     directions.forEach(([dirX, dirY]) => {

@@ -10,6 +10,8 @@ import {
   Queen,
   King,
 } from "@utils/ChessBoard/Figures";
+import { Figure, SIDES } from "@utils/ChessBoard/Figures/Figure";
+import { IsKing } from "@utils/ChessBoard/Figures/King";
 
 interface Size {
   width: number;
@@ -51,7 +53,13 @@ export class ChessBoard {
   // cell[y][x]
   private cells: Cell[][] = [];
   private selectedCell: Cell | null = null;
-  private canMoveCells: [x: number, y: number][] = [];
+  private canMoveCells: {
+    move: [x: number, y: number][];
+    castlings: ReturnType<Figure["getAvailableCells"]>["castling"];
+  } = {
+    move: [],
+    castlings: [],
+  };
   private check: {
     kingCell: Cell;
     checkCell: Cell;
@@ -160,9 +168,46 @@ export class ChessBoard {
         if (mouseX >= startX && mouseX <= endX) {
           if (mouseY >= startY && mouseY <= endY) {
             if (this.selectedCell) {
-              const canIMove = !!this.canMoveCells.filter(([moveX, moveY]) => {
-                return moveX === x && moveY === y;
-              }).length;
+              const canIMove = !!this.canMoveCells.move.filter(
+                ([moveX, moveY]) => {
+                  return moveX === x && moveY === y;
+                }
+              ).length;
+
+              const castlings = this.canMoveCells.castlings.filter(
+                ({ nextKingPosition }) => {
+                  return nextKingPosition.x === x && nextKingPosition.y === y;
+                }
+              );
+
+              const moveCastling = !!castlings.length;
+
+              if (moveCastling) {
+                const { nextKingPosition, nextRookPosition, prevRookPosition } =
+                  castlings[0];
+
+                const prevRookCell =
+                  this.cells[prevRookPosition.y][prevRookPosition.x];
+                const prevRookFigure = prevRookCell.getFigure();
+
+                const nextRookCell =
+                  this.cells[nextRookPosition.y][nextRookPosition.x];
+
+                const kingFigure = this.selectedCell.getFigure();
+                const nextKingCell =
+                  this.cells[nextKingPosition.y][nextKingPosition.x];
+
+                kingFigure?.setMoved();
+                prevRookFigure?.setMoved();
+                nextRookCell.setFigure(prevRookFigure);
+                nextKingCell.setFigure(kingFigure);
+                prevRookCell.setFigure(null);
+                // prevKingCell
+                this.selectedCell.setFigure(null);
+
+                this.selectedCell = null;
+                break;
+              }
 
               if (canIMove) {
                 const selectedFigure = this.selectedCell.getFigure();
@@ -171,9 +216,10 @@ export class ChessBoard {
                 cell.setFigure(selectedFigure);
                 this.selectedCell.setFigure(null);
                 this.selectedCell = null;
-              } else {
-                this.selectedCell = cell;
+                break;
               }
+
+              this.selectedCell = cell;
             } else {
               this.selectedCell = cell;
             }
@@ -387,6 +433,118 @@ export class ChessBoard {
     return result;
   }
 
+  private filterBeatCellsWithEmptyCells(
+    cell: Cell,
+    beat: [x: number, y: number][][]
+  ): [x: number, y: number][] {
+    const result: [x: number, y: number][] = [];
+
+    const myCellFigure = cell.getFigure();
+
+    if (!myCellFigure) return result;
+
+    const mySide = myCellFigure.getSide();
+
+    for (let i = 0; i < beat.length; i++) {
+      for (let j = 0; j < beat[i].length; j++) {
+        const [x, y] = beat[i][j];
+        const cell = this.cells[y][x];
+
+        const figure = cell.getFigure();
+
+        if (!figure) {
+          result.push([x, y]);
+          continue;
+        }
+
+        const sameSide = figure.sameSide(mySide);
+
+        if (sameSide) {
+          break;
+        }
+
+        result.push([x, y]);
+
+        break;
+      }
+    }
+
+    return result;
+  }
+
+  private canBeatMeBySource(sources: Cell[], side: SIDES) {
+    for (let i = 0; i < sources.length; i++) {
+      const source = sources[i];
+
+      const sourceFigure = source.getFigure();
+
+      if (!sourceFigure) continue;
+
+      const sameSide = sourceFigure.sameSide(side);
+
+      if (!sameSide) {
+        console.log(sourceFigure);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private canMoveCastling(
+    cell: Cell,
+    castling: ReturnType<Figure["getAvailableCells"]>["castling"][number]
+  ): boolean {
+    if (!cell) return false;
+
+    const { x, y } = cell.getPosition();
+    const { direction, nextKingPosition, prevKingPosition } = castling;
+    const king = this.cells[prevKingPosition.y][prevKingPosition.x];
+    const kingFigure = king.getFigure();
+
+    if (!kingFigure) return false;
+
+    const kingSide = kingFigure.getSide();
+
+    const sources = this.cellTargets[x]?.[y];
+
+    const nextX = x + direction[0];
+    const nextY = y + direction[1];
+    const nextCell = this.cells[nextY]?.[nextX];
+    const isLast = nextKingPosition.x === x && nextKingPosition.y === y;
+
+    if (sources?.length) {
+      const canBeatBySources = this.canBeatMeBySource(sources, kingSide);
+
+      if (canBeatBySources) return false;
+
+      if (isLast) return true;
+
+      return this.canMoveCastling(nextCell, castling);
+    }
+
+    return !isLast ? this.canMoveCastling(nextCell, castling) : true;
+  }
+
+  private filterCastling(
+    cell: Cell,
+    castlings: ReturnType<Figure["getAvailableCells"]>["castling"]
+  ) {
+    const figure = cell.getFigure();
+
+    if (!figure) return [];
+
+    const isKing = IsKing(figure);
+
+    if (!isKing) return [];
+
+    const result = castlings.filter((castling) => {
+      return this.canMoveCastling(cell, castling);
+    });
+
+    return result;
+  }
+
   private getTargets() {
     const result: ChessBoard["cellTargets"] = {};
 
@@ -403,7 +561,7 @@ export class ChessBoard {
           this.cells
         );
 
-        const beat = this.filterBeatCells(cell, notFilteredBeat);
+        const beat = this.filterBeatCellsWithEmptyCells(cell, notFilteredBeat);
 
         beat.forEach(([x, y]) => {
           result[x] = {
@@ -480,18 +638,25 @@ export class ChessBoard {
     const figure = cell?.getFigure();
 
     if (!figure || !cell) {
-      this.canMoveCells = [];
+      this.canMoveCells = {
+        move: [],
+        castlings: [],
+      };
       return;
     }
 
     const { x, y } = cell.getPosition();
 
-    const { beat: beatNotFiltered, move: moveNotFiltred } =
-      figure.getAvailableCells(cell, this.cells);
+    const {
+      beat: beatNotFiltered,
+      move: moveNotFiltred,
+      castling: castlingsNotFiltered,
+    } = figure.getAvailableCells(cell, this.cells);
 
     const mySources = this.cellTargets[x]?.[y];
     const hasSources = !!mySources?.length;
     let priorityToBeat: [x: number, y: number] | null = null;
+    let canMove = true;
 
     if (hasSources) {
       const cellsWhoWillCheck = this.getCheckBySources(cell, mySources);
@@ -500,19 +665,22 @@ export class ChessBoard {
 
       if (cellsWhoWillCheck.length) {
         const { x, y } = cellsWhoWillCheck[0].getPosition();
-
+        canMove = false;
         priorityToBeat = [x, y];
       }
     }
 
-    const move = this.filterMoveCells(cell, moveNotFiltred);
+    const move = canMove ? this.filterMoveCells(cell, moveNotFiltred) : [];
     const beat = this.filterBeatCells(
       cell,
       beatNotFiltered,
       priorityToBeat ?? undefined
     );
+    const castlings = this.filterCastling(cell, castlingsNotFiltered);
 
-    const newCanMoveCells: ChessBoard["canMoveCells"] = [];
+    const newCanMoveCells: ChessBoard["canMoveCells"]["move"] = [];
+    const newCanMoveCastlingsCells: ChessBoard["canMoveCells"]["castlings"] =
+      [];
 
     for (let i = 0; i < move.length; i++) {
       const [x, y] = move[i];
@@ -545,7 +713,20 @@ export class ChessBoard {
       newCanMoveCells.push([availableCellX, availableCellY]);
     }
 
-    this.canMoveCells = newCanMoveCells;
+    for (let i = 0; i < castlings.length; i++) {
+      const castling = castlings[i];
+      const { nextKingPosition } = castling;
+      const nextKingCell = this.cells[nextKingPosition.y]?.[nextKingPosition.x];
+
+      if (!nextKingCell) continue;
+
+      this.drawMoveHightLight(nextKingCell);
+
+      newCanMoveCastlingsCells.push(castling);
+    }
+
+    this.canMoveCells.move = newCanMoveCells;
+    this.canMoveCells.castlings = newCanMoveCastlingsCells;
   }
 
   private drawMoveHightLightWithFigure(cell: Cell) {
@@ -613,7 +794,6 @@ export class ChessBoard {
     this.ctx.closePath();
   }
 
-  // TODO: Возможно обьединить drawBackGround и drawFigures
   private drawBackGround() {
     const { x, y } = this.cellCount;
 
