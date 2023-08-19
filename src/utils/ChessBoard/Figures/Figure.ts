@@ -9,6 +9,13 @@ interface FigurePayload {
 type getAvailableCells = {
   move: [x: number, y: number][][];
   beat: [x: number, y: number][][];
+  castling: {
+    prevRookPosition: { x: number; y: number };
+    prevKingPosition: { x: number; y: number };
+    nextRookPosition: { x: number; y: number };
+    nextKingPosition: { x: number; y: number };
+    direction: [x: number, y: number];
+  }[];
 };
 
 export enum SIDES {
@@ -55,6 +62,10 @@ export class Figure {
     return [[x, y], ...result];
   }
 
+  public getMoved() {
+    return this.isMoved;
+  }
+
   // получение координат доступных клеток для хода
   public getAvailableCells(
     myCell: Cell,
@@ -63,6 +74,7 @@ export class Figure {
     return {
       beat: [],
       move: [],
+      castling: [],
     };
   }
 
@@ -83,6 +95,6 @@ export class Figure {
   }
 
   public getSide() {
-    return this.side
+    return this.side;
   }
 }
