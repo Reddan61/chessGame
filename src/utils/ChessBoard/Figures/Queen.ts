@@ -53,3 +53,7 @@ export class Queen extends Figure {
     return availableCells;
   }
 }
+
+export const IsQueen = (figure: Figure) => {
+  return figure instanceof Queen;
+};
