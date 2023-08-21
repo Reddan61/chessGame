@@ -63,6 +63,7 @@ export class ChessBoard {
   private check: {
     kingCell: Cell;
     checkCell: Cell;
+    needToBlockCells: [x: number, y: number][];
   } | null = null;
   private cellTargets: Record<number, Record<number, Cell[]>> = {};
 
@@ -265,28 +266,36 @@ export class ChessBoard {
 
         if (!figure) continue;
 
-        const { beat: notFilteredBeat } = figure.getAvailableCells(
-          cell,
-          this.cells
-        );
+        const { beat } = figure.getAvailableCells(cell, this.cells);
+        const side = figure.getSide();
 
-        const beat = this.filterBeatCells(cell, notFilteredBeat);
-
+        // получение клеток, которые нужно перекрыть чтобы убрать шах
         for (let k = 0; k < beat.length; k++) {
-          const [x, y] = beat[k];
-          const potentialCell = this.cells[y][x];
+          const cells: [x: number, y: number][] = [];
 
-          const figure = potentialCell.getFigure();
+          for (let h = 0; h < beat[k].length; h++) {
+            const [x, y] = beat[k][h];
 
-          if (!figure) return false;
+            const potentialCell = this.cells[y][x];
 
-          const isKing = !figure.canBeat();
+            const figure = potentialCell.getFigure();
 
-          if (isKing) {
+            if (!figure) {
+              cells.push(beat[k][h]);
+              continue;
+            }
+
+            const isKing = !figure.canBeat();
+            const sameSide = figure.sameSide(side);
+
+            if (!isKing || sameSide) break;
+
             check = {
               checkCell: cell,
               kingCell: potentialCell,
+              needToBlockCells: cells,
             };
+
             break yFor;
           }
         }
@@ -318,48 +327,11 @@ export class ChessBoard {
     this.drawDirections();
     console.log(this);
   }
-  // открытые клетки для хода во время шаха
-  // private filterMovesWhileCheck(
-  //   move: [X: number, y: number][],
-  //   beat: [X: number, y: number][]
-  // ): {
-  //   move: [X: number, y: number][];
-  //   beat: [X: number, y: number][];
-  // } {
-  //   const check = this.check;
-
-  //   if (!check)
-  //     return {
-  //       move,
-  //       beat,
-  //     };
-
-  //   const { checkCell } = check;
-  //   const { x, y } = checkCell.getPosition();
-
-  //   const newMoves = move.filter(([moveX, moveY]) => {
-  //     const found = check.needToBlockCells.find((cell) => {
-  //       const { x, y } = cell.getPosition();
-
-  //       return moveX === x && moveY === y;
-  //     });
-
-  //     return !!found;
-  //   });
-
-  //   const newBeat = beat.filter(([beatX, beatY]) => {
-  //     return beatX === x && beatY === y;
-  //   });
-
-  //   return {
-  //     beat: newBeat,
-  //     move: newMoves,
-  //   };
-  // }
 
   private filterMoveCells(
     cell: Cell,
-    move: [x: number, y: number][][]
+    move: [x: number, y: number][][],
+    priority?: [x: number, y: number][]
   ): [x: number, y: number][] {
     const result: [x: number, y: number][] = [];
 
@@ -375,7 +347,18 @@ export class ChessBoard {
         const figure = cell.getFigure();
 
         if (!figure) {
-          result.push([x, y]);
+          if (priority) {
+            const isPriority = priority.some(
+              ([priorityX, priorityY]) => priorityX === x && priorityY === y
+            );
+
+            if (isPriority) {
+              result.push([x, y]);
+            }
+          } else {
+            result.push([x, y]);
+          }
+
           continue;
         }
 
@@ -575,14 +558,14 @@ export class ChessBoard {
     this.cellTargets = result;
   }
 
-  // получение фигур, которые сделают шах, если убрать текущую фигуру
+  // получение фигур, которые сделают шах, если убрать текущую фигуру + доступные ходы без шаха
   private getCheckBySources(cell: Cell, sources: Cell[]) {
     const { x, y } = cell.getPosition();
     const figure = cell.getFigure();
 
     if (!figure) return [];
 
-    const result: Cell[] = [];
+    const result: { cell: Cell; direction: [x: number, y: number][] }[] = [];
 
     for (let i = 0; i < sources.length; i++) {
       const source = sources[i];
@@ -597,11 +580,15 @@ export class ChessBoard {
 
       for (let j = 0; j < beat.length; j++) {
         const direction = beat[j];
+        const resultDirection: [x: number, y: number][] = [];
 
         for (let k = 0; k < direction.length; k++) {
           const beatPosition = direction[k];
-
           const isCurrentCell = x === beatPosition[0] && y === beatPosition[1];
+
+          if (!isCurrentCell && !hasCurrentCell) {
+            resultDirection.push(beatPosition);
+          }
 
           if (isCurrentCell) {
             hasCurrentCell = true;
@@ -613,14 +600,20 @@ export class ChessBoard {
 
             const beatFigure = beatCell.getFigure();
 
-            if (!beatFigure) continue;
+            if (!beatFigure) {
+              resultDirection.push(beatPosition);
+              continue;
+            }
 
             const beatSide = beatFigure.getSide();
             const sameSide = figure.sameSide(beatSide);
             const isKing = !beatFigure.canBeat();
 
             if (!sameSide && isKing) {
-              result.push(source);
+              result.push({
+                cell: source,
+                direction: resultDirection,
+              });
               break;
             }
 
@@ -656,21 +649,43 @@ export class ChessBoard {
     const mySources = this.cellTargets[x]?.[y];
     const hasSources = !!mySources?.length;
     let priorityToBeat: [x: number, y: number] | null = null;
+    let priorityToMove: [x: number, y: number][] | null = null;
     let canMove = true;
 
     if (hasSources) {
       const cellsWhoWillCheck = this.getCheckBySources(cell, mySources);
-      console.log(cellsWhoWillCheck);
+
       if (cellsWhoWillCheck.length > 1) return;
 
       if (cellsWhoWillCheck.length) {
-        const { x, y } = cellsWhoWillCheck[0].getPosition();
-        canMove = false;
+        const { cell, direction } = cellsWhoWillCheck[0];
+        const { x, y } = cell.getPosition();
+        priorityToMove = direction;
         priorityToBeat = [x, y];
       }
     }
 
-    const move = canMove ? this.filterMoveCells(cell, moveNotFiltred) : [];
+    // получение возможных ходов для блока шаха
+    if (this.check) {
+      const side = figure.getSide();
+      const checkCell = this.check.checkCell;
+      const { x, y } = checkCell.getPosition();
+      const sameSide = checkCell.getFigure()?.sameSide(side);
+
+      if (!sameSide) {
+        if (priorityToMove) {
+          priorityToMove = [...priorityToMove, ...this.check.needToBlockCells];
+        } else {
+          priorityToMove = this.check.needToBlockCells;
+        }
+
+        priorityToBeat = [x, y];
+      }
+    }
+
+    const move = canMove
+      ? this.filterMoveCells(cell, moveNotFiltred, priorityToMove ?? undefined)
+      : [];
     const beat = this.filterBeatCells(
       cell,
       beatNotFiltered,
