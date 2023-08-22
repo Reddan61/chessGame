@@ -66,6 +66,7 @@ export class ChessBoard {
     needToBlockCells: [x: number, y: number][];
   } | null = null;
   private cellTargets: Record<number, Record<number, Cell[]>> = {};
+  private currentSide: SIDES = SIDES.WHITE;
 
   constructor(canvas: ChessBoard["canvas"]) {
     const ctx = canvas.getContext("2d");
@@ -153,6 +154,14 @@ export class ChessBoard {
     this.update();
   }
 
+  private moved() {
+    if (this.currentSide === SIDES.WHITE) {
+      this.currentSide = SIDES.BLACK;
+    } else {
+      this.currentSide = SIDES.WHITE;
+    }
+  }
+
   private clickHandler(e: MouseEvent) {
     const { left, top } = this.canvas.getBoundingClientRect();
     const { clientX, clientY } = e;
@@ -160,7 +169,7 @@ export class ChessBoard {
     const mouseX = clientX - left;
     const mouseY = clientY - top;
 
-    for (let i = 0; i < this.cells.length; i++) {
+    yFor: for (let i = 0; i < this.cells.length; i++) {
       for (let j = 0; j < this.cells[i].length; j++) {
         const cell = this.cells[i][j];
 
@@ -207,25 +216,23 @@ export class ChessBoard {
                 this.selectedCell.setFigure(null);
 
                 this.selectedCell = null;
-                break;
-              }
-
-              if (canIMove) {
+                this.moved();
+              } else if (canIMove) {
                 const selectedFigure = this.selectedCell.getFigure();
 
                 selectedFigure?.setMoved();
                 cell.setFigure(selectedFigure);
                 this.selectedCell.setFigure(null);
                 this.selectedCell = null;
-                break;
+                this.moved();
+              } else {
+                this.selectedCell = cell;
               }
-
-              this.selectedCell = cell;
             } else {
               this.selectedCell = cell;
             }
 
-            break;
+            break yFor;
           }
         }
       }
@@ -308,10 +315,64 @@ export class ChessBoard {
   }
   // TODO: надо проверить могу ли я двинуться королем или перекрыть шах
   private getCheckMate() {
-    // const check = this.check;
-    // if (!check) return false;
-    // const { kingCell } = check;
-    // const { move, beat } = this.getKingMoveCells(kingCell);
+    const check = this.check;
+    if (!check) return false;
+
+    const { kingCell, checkCell } = check;
+
+    const checkFigure = checkCell.getFigure();
+
+    if (!checkFigure) return false;
+
+    const checkSide = checkFigure.getSide();
+    const { x: checkX, y: checkY } = checkCell.getPosition();
+
+    const { move, beat } = this.getKingMoveCells(kingCell);
+
+    const cantKingMove = !move.length && !beat.length;
+
+    if (!cantKingMove) return false;
+
+    // проверка на блок шаха союзными фигурами
+    for (let i = 0; i < this.cells.length; i++) {
+      for (let j = 0; j < this.cells[i].length; j++) {
+        const cell = this.cells[i][j];
+        const figure = cell.getFigure();
+
+        if (!figure) continue;
+
+        const sameSide = figure.sameSide(checkSide);
+
+        if (sameSide) continue;
+
+        const { move: movesNotFiltered, beat: beatNotFiltered } =
+          figure.getAvailableCells(cell, this.cells);
+
+        const isKing = IsKing(figure);
+
+        const { move, beat } = isKing
+          ? this.getKingMoveCells(cell)
+          : {
+              move: this.filterMoveCells(
+                cell,
+                movesNotFiltered,
+                check.needToBlockCells
+              ),
+              beat: this.filterBeatCells(cell, beatNotFiltered, [
+                checkX,
+                checkY,
+              ]),
+            };
+
+        const canDoSomething = move.length || beat.length;
+
+        if (canDoSomething) {
+          return false;
+        }
+      }
+    }
+
+    return cantKingMove;
   }
 
   private normalizeSize() {
@@ -329,11 +390,21 @@ export class ChessBoard {
   private update() {
     this.getTargets();
     this.getCheck();
-    this.getCheckMate();
+
+    const isCheckMate = this.getCheckMate();
+
+    if (isCheckMate) {
+      this.restart();
+      return;
+    }
+
     this.drawBackGround();
     this.drawFigures();
     this.drawDirections();
-    console.log(this);
+  }
+
+  private restart() {
+    this.init();
   }
 
   private filterMoveCells(
@@ -692,8 +763,9 @@ export class ChessBoard {
   private drawDirections() {
     const cell = this.selectedCell;
     const figure = cell?.getFigure();
+    const isCurrentSide = figure?.sameSide(this.currentSide);
 
-    if (!figure || !cell) {
+    if (!figure || !isCurrentSide || !cell) {
       this.canMoveCells = {
         move: [],
         castlings: [],
@@ -746,27 +818,20 @@ export class ChessBoard {
       }
     }
 
-    let move: [x: number, y: number][] = [];
-    let beat: [x: number, y: number][] = [];
-
-    if (IsKing(figure)) {
-      const { move: moveKing, beat: beatKing } = this.getKingMoveCells(cell);
-
-      move = moveKing;
-      beat = beatKing;
-    } else {
-      move = this.filterMoveCells(
-        cell,
-        moveNotFiltred,
-        priorityToMove ?? undefined
-      );
-
-      beat = this.filterBeatCells(
-        cell,
-        beatNotFiltered,
-        priorityToBeat ?? undefined
-      );
-    }
+    const { beat, move } = IsKing(figure)
+      ? this.getKingMoveCells(cell)
+      : {
+          move: this.filterMoveCells(
+            cell,
+            moveNotFiltred,
+            priorityToMove ?? undefined
+          ),
+          beat: this.filterBeatCells(
+            cell,
+            beatNotFiltered,
+            priorityToBeat ?? undefined
+          ),
+        };
 
     const castlings = this.filterCastling(cell, castlingsNotFiltered);
 
