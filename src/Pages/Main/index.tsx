@@ -1,5 +1,9 @@
-import { ChessBoard } from "@components/ChessBoard"
+import { ChessBoard } from "@components/ChessBoard";
 
 export const MainPage = () => {
-    return <><ChessBoard /></>
-}
+  return (
+    <>
+      <ChessBoard />
+    </>
+  );
+};

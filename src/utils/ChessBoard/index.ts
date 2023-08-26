@@ -18,6 +18,12 @@ interface Size {
   height: number;
 }
 
+export interface Handlers {
+  changeSide: (side: SIDES) => void;
+  onBeat: (target: Figure, by: Figure) => void;
+  onEnd: (wonSide: SIDES) => void;
+}
+
 const FiguresConstructors = {
   [Figures.PAWN]: Pawn,
   [Figures.HORSE]: Horse,
@@ -67,8 +73,9 @@ export class ChessBoard {
   } | null = null;
   private cellTargets: Record<number, Record<number, Cell[]>> = {};
   private currentSide: SIDES = SIDES.WHITE;
+  private handlers: Handlers | null = null;
 
-  constructor(canvas: ChessBoard["canvas"]) {
+  constructor(canvas: ChessBoard["canvas"], handlers: Handlers) {
     const ctx = canvas.getContext("2d");
 
     if (!ctx) {
@@ -78,6 +85,7 @@ export class ChessBoard {
     this.canvas = canvas;
     this.ctx = ctx;
 
+    this.handlers = handlers;
     this.init();
   }
 
@@ -146,8 +154,18 @@ export class ChessBoard {
     return Promise.all(promises);
   }
 
+  private setSide(newSide: SIDES) {
+    this.currentSide = newSide;
+    this.handlers?.changeSide(newSide);
+  }
+
+  private initSide() {
+    this.setSide(SIDES.WHITE);
+  }
+
   private async init() {
     this.normalizeSize();
+    this.initSide();
     this.initCells();
     await this.initFigures();
     this.initHandlers();
@@ -156,9 +174,9 @@ export class ChessBoard {
 
   private moved() {
     if (this.currentSide === SIDES.WHITE) {
-      this.currentSide = SIDES.BLACK;
+      this.setSide(SIDES.BLACK);
     } else {
-      this.currentSide = SIDES.WHITE;
+      this.setSide(SIDES.WHITE);
     }
   }
 
@@ -219,6 +237,18 @@ export class ChessBoard {
                 this.moved();
               } else if (canIMove) {
                 const selectedFigure = this.selectedCell.getFigure();
+                const cellFigure = cell.getFigure();
+
+                // мы бьем фигуру противника
+                if (cellFigure && selectedFigure) {
+                  const sameSide = selectedFigure.sameSide(
+                    cellFigure.getSide()
+                  );
+
+                  if (!sameSide) {
+                    this.handlers?.onBeat(cellFigure, selectedFigure);
+                  }
+                }
 
                 selectedFigure?.setMoved();
                 cell.setFigure(selectedFigure);
@@ -313,7 +343,7 @@ export class ChessBoard {
 
     return !!check;
   }
-  // TODO: надо проверить могу ли я двинуться королем или перекрыть шах
+
   private getCheckMate() {
     const check = this.check;
     if (!check) return false;
@@ -353,15 +383,16 @@ export class ChessBoard {
         const { move, beat } = isKing
           ? this.getKingMoveCells(cell)
           : {
-              move: this.filterMoveCells(
+              move: this.filterMoveCells({
                 cell,
-                movesNotFiltered,
-                check.needToBlockCells
-              ),
-              beat: this.filterBeatCells(cell, beatNotFiltered, [
-                checkX,
-                checkY,
-              ]),
+                move: movesNotFiltered,
+                priority: check.needToBlockCells,
+              }),
+              beat: this.filterBeatCells({
+                cell,
+                beat: beatNotFiltered,
+                priority: [checkX, checkY],
+              }),
             };
 
         const canDoSomething = move.length || beat.length;
@@ -390,28 +421,32 @@ export class ChessBoard {
   private update() {
     this.getTargets();
     this.getCheck();
-
     const isCheckMate = this.getCheckMate();
+    this.drawBackGround();
+    this.drawFigures();
 
     if (isCheckMate) {
-      this.restart();
+      this.handlers?.onEnd(this.currentSide);
+
       return;
     }
 
-    this.drawBackGround();
-    this.drawFigures();
     this.drawDirections();
   }
 
-  private restart() {
+  public restart() {
     this.init();
   }
 
-  private filterMoveCells(
-    cell: Cell,
-    move: [x: number, y: number][][],
-    priority?: [x: number, y: number][]
-  ): [x: number, y: number][] {
+  private filterMoveCells({
+    move,
+    cell,
+    priority,
+  }: {
+    cell: Cell;
+    move: [x: number, y: number][][];
+    priority?: [x: number, y: number][];
+  }): [x: number, y: number][] {
     const result: [x: number, y: number][] = [];
 
     const myCellFigure = cell.getFigure();
@@ -448,11 +483,15 @@ export class ChessBoard {
     return result;
   }
 
-  private filterBeatCells(
-    cell: Cell,
-    beat: [x: number, y: number][][],
-    priority?: [x: number, y: number]
-  ): [x: number, y: number][] {
+  private filterBeatCells({
+    beat,
+    cell,
+    priority,
+  }: {
+    cell: Cell;
+    beat: [x: number, y: number][][];
+    priority?: [x: number, y: number];
+  }): [x: number, y: number][] {
     const result: [x: number, y: number][] = [];
 
     const myCellFigure = cell.getFigure();
@@ -495,10 +534,15 @@ export class ChessBoard {
     return result;
   }
 
-  private filterBeatCellsWithEmptyCells(
-    cell: Cell,
-    beat: [x: number, y: number][][]
-  ): [x: number, y: number][] {
+  private filterBeatCellsWithEmptyCells({
+    beat,
+    cell,
+    ignoreCell,
+  }: {
+    cell: Cell;
+    beat: [x: number, y: number][][];
+    ignoreCell?: [x: number, y: number];
+  }): [x: number, y: number][] {
     const result: [x: number, y: number][] = [];
 
     const myCellFigure = cell.getFigure();
@@ -508,6 +552,11 @@ export class ChessBoard {
     for (let i = 0; i < beat.length; i++) {
       for (let j = 0; j < beat[i].length; j++) {
         const [x, y] = beat[i][j];
+
+        const isIgnore = x === ignoreCell?.[0] && y === ignoreCell?.[1];
+
+        if (isIgnore) continue;
+
         const cell = this.cells[y][x];
 
         const figure = cell.getFigure();
@@ -614,7 +663,10 @@ export class ChessBoard {
           this.cells
         );
 
-        const beat = this.filterBeatCellsWithEmptyCells(cell, notFilteredBeat);
+        const beat = this.filterBeatCellsWithEmptyCells({
+          cell,
+          beat: notFilteredBeat,
+        });
 
         beat.forEach(([x, y]) => {
           result[x] = {
@@ -714,49 +766,55 @@ export class ChessBoard {
       };
 
     const kingSide = figure.getSide();
+    const { x: kingX, y: kingY } = kingCell.getPosition();
     const { move: notFilteredMove, beat: notFilteredBeat } =
       figure.getAvailableCells(kingCell, this.cells);
 
-    const moves = this.filterMoveCells(kingCell, notFilteredMove);
-    const beats = this.filterBeatCells(kingCell, notFilteredBeat);
-    const resultMoves: typeof moves = [];
-    const resultBeats: typeof beats = [];
+    let kingMoves = this.filterMoveCells({
+      cell: kingCell,
+      move: notFilteredMove,
+    });
+    let kingBeats = this.filterBeatCells({
+      cell: kingCell,
+      beat: notFilteredBeat,
+    });
 
-    for (let i = 0; i < moves.length; i++) {
-      const [xMove, yMove] = moves[i];
-      const sources = this.cellTargets[xMove]?.[yMove];
+    for (let i = 0; i < this.cells.length; i++) {
+      for (let j = 0; j < this.cells[i].length; j++) {
+        const cell = this.cells[i][j];
 
-      if (!sources || !sources.length) {
-        resultMoves.push([xMove, yMove]);
-        continue;
+        const figure = cell.getFigure();
+
+        if (!figure) continue;
+
+        const sameSide = figure.sameSide(kingSide);
+
+        if (sameSide) continue;
+
+        const { beat } = figure.getAvailableCells(cell, this.cells);
+
+        const filteredBeat = this.filterBeatCellsWithEmptyCells({
+          cell,
+          beat,
+          ignoreCell: [kingX, kingY],
+        });
+
+        kingMoves = kingMoves.filter(([kingX, kingY]) => {
+          return !filteredBeat.some(
+            ([beatX, beatY]) => kingX === beatX && kingY === beatY
+          );
+        });
+        kingBeats = kingBeats.filter(([kingX, kingY]) => {
+          return !filteredBeat.some(
+            ([beatX, beatY]) => kingX === beatX && kingY === beatY
+          );
+        });
       }
-
-      const canCheckMe = this.canBeatMeBySource(sources, kingSide);
-
-      if (canCheckMe) continue;
-
-      resultMoves.push([xMove, yMove]);
-    }
-
-    for (let i = 0; i < beats.length; i++) {
-      const [xBeat, yBeat] = beats[i];
-      const beatSources = this.cellTargets[xBeat]?.[yBeat];
-
-      if (!beatSources) {
-        resultBeats.push([xBeat, yBeat]);
-        continue;
-      }
-
-      const canCheckMe = this.canBeatMeBySource(beatSources, kingSide);
-
-      if (canCheckMe) continue;
-
-      resultBeats.push([xBeat, yBeat]);
     }
 
     return {
-      beat: resultBeats,
-      move: resultMoves,
+      beat: kingBeats,
+      move: kingMoves,
     };
   }
 
@@ -821,18 +879,17 @@ export class ChessBoard {
     const { beat, move } = IsKing(figure)
       ? this.getKingMoveCells(cell)
       : {
-          move: this.filterMoveCells(
+          move: this.filterMoveCells({
             cell,
-            moveNotFiltred,
-            priorityToMove ?? undefined
-          ),
-          beat: this.filterBeatCells(
+            move: moveNotFiltred,
+            priority: priorityToMove ?? undefined,
+          }),
+          beat: this.filterBeatCells({
             cell,
-            beatNotFiltered,
-            priorityToBeat ?? undefined
-          ),
+            beat: beatNotFiltered,
+            priority: priorityToBeat ?? undefined,
+          }),
         };
-
     const castlings = this.filterCastling(cell, castlingsNotFiltered);
 
     const newCanMoveCells: ChessBoard["canMoveCells"]["move"] = [];

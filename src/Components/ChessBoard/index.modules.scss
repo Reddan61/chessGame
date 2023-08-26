@@ -1,7 +1,55 @@
 .board {
-    min-width: 600px;
-    max-width: 600px;
-    min-height: 600px;
-    max-height: 600px;
-    border: 1px solid black;
+  display: flex;
+
+  min-width: 600px;
+  max-width: 600px;
+  min-height: 600px;
+  max-height: 600px;
+  border: 1px solid black;
+
+  canvas {
+    flex: 1 1 auto;
+  }
+}
+
+.body {
+  display: flex;
+  width: 100%;
+
+  &::before {
+    content: "";
+    width: calc(50% - 600px / 2);
+  }
+}
+
+.header {
+  display: flex;
+  justify-content: center;
+  padding: 10px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.restart {
+  display: flex;
+  justify-content: center;
+  margin: 10px 0 0 0;
+  button {
+    padding: 5px 10px;
+    border-radius: 8px;
+    color: white;
+    background-color: rgb(48, 46, 46);
+  }
+}
+
+.beat {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+
+  &__side {
+    display: flex;
+    flex-wrap: wrap;
+    max-width: 200px;
+  }
 }
