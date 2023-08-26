@@ -90,7 +90,7 @@ export class Figure {
     return true;
   }
 
-  public sameSide(side: Figure["side"]) {
+  public sameSide(side?: Figure["side"]) {
     return side === this.side;
   }
 
