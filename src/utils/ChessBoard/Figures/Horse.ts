@@ -1,13 +1,15 @@
 import { Figure, SIDES } from "@utils/ChessBoard/Figures/Figure";
 import { Cell } from "@utils/ChessBoard/Cell";
-import HorseWhiteSVG from "@svg/HorseWhite.svg";
-import HorseBlackSVG from "@svg/HorseBlack.svg";
+import { FiguresImages } from "@utils/ChessBoard/Figures/Images";
 
 type Payload = Omit<ConstructorParameters<typeof Figure>["0"], "image">;
 
 export class Horse extends Figure {
   constructor({ side }: Payload) {
-    const pawn = side === SIDES.WHITE ? HorseWhiteSVG : HorseBlackSVG;
+    const pawn =
+      side === SIDES.WHITE
+        ? FiguresImages["WhiteHorse"]
+        : FiguresImages["BlackHorse"];
 
     super({
       image: pawn,
@@ -34,7 +36,7 @@ export class Horse extends Figure {
     const availbleCells: ReturnType<Figure["getAvailableCells"]> = {
       beat: [],
       move: [],
-      castling: []
+      castling: [],
     };
 
     directions.forEach(([dirX, dirY]) => {

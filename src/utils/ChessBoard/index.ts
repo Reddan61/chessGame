@@ -12,6 +12,8 @@ import {
 } from "@utils/ChessBoard/Figures";
 import { Figure, SIDES } from "@utils/ChessBoard/Figures/Figure";
 import { IsKing } from "@utils/ChessBoard/Figures/King";
+import { IsPawn } from "@utils/ChessBoard/Figures/Pawn";
+import { LoadFiguresImages } from "@src/utils/ChessBoard/Figures/Images";
 
 interface Size {
   width: number;
@@ -22,6 +24,11 @@ export interface Handlers {
   changeSide: (side: SIDES) => void;
   onBeat: (target: Figure, by: Figure) => void;
   onEnd: (wonSide: SIDES) => void;
+  onPawnChange: ({}: {
+    pawn: Figure;
+    nextCell: Cell;
+    availableFigures: Figure[];
+  }) => Promise<Figure | null>;
 }
 
 const FiguresConstructors = {
@@ -39,6 +46,8 @@ export class ChessBoard {
 
   private size: Size;
 
+  private loading = false;
+  private isCheckMate = false;
   private cellColor = {
     primary: "#b58863",
     secondary: "#f0d9b5",
@@ -129,9 +138,8 @@ export class ChessBoard {
   }
 
   private initFigures() {
-    // начальное расстановка фигур и подгрузка их картинок
+    // начальное расстановка фигур
     const config = FiguresConfig;
-    const promises = [];
 
     for (let i = 0; i < config.length; i++) {
       const { coords, figure, side } = config[i];
@@ -141,17 +149,8 @@ export class ChessBoard {
         side,
       });
 
-      promises.push(
-        new Promise((res) => {
-          Figure.getImage().onload = () => {
-            cell.setFigure(Figure);
-            res(true);
-          };
-        })
-      );
+      cell.setFigure(Figure);
     }
-
-    return Promise.all(promises);
   }
 
   private setSide(newSide: SIDES) {
@@ -163,11 +162,17 @@ export class ChessBoard {
     this.setSide(SIDES.WHITE);
   }
 
+  private async loadImages() {
+    await LoadFiguresImages();
+  }
+
   private async init() {
+    this.isCheckMate = false;
     this.normalizeSize();
     this.initSide();
     this.initCells();
-    await this.initFigures();
+    await this.loadImages();
+    this.initFigures();
     this.initHandlers();
     this.update();
   }
@@ -180,12 +185,42 @@ export class ChessBoard {
     }
   }
 
-  private clickHandler(e: MouseEvent) {
+  private async withLoading<T>({ promise }: { promise: Promise<T> | null }) {
+    this.loading = true;
+
+    const result = await promise;
+
+    this.loading = false;
+
+    return result;
+  }
+
+  private isChangePawn(pawnCell: Cell, nextCell: Cell) {
+    const pawn = pawnCell.getFigure();
+
+    if (!pawn) return false;
+
+    const { y } = nextCell.getPosition();
+
+    const side = pawn.getSide();
+
+    const isWhite = side === SIDES.WHITE;
+
+    const endY = isWhite ? this.cellCount.y - 1 : 0;
+
+    if (endY === y) return true;
+
+    return false;
+  }
+
+  private async clickHandler(e: MouseEvent) {
     const { left, top } = this.canvas.getBoundingClientRect();
     const { clientX, clientY } = e;
 
     const mouseX = clientX - left;
     const mouseY = clientY - top;
+
+    if (this.loading || this.isCheckMate) return;
 
     yFor: for (let i = 0; i < this.cells.length; i++) {
       for (let j = 0; j < this.cells[i].length; j++) {
@@ -236,7 +271,7 @@ export class ChessBoard {
                 this.selectedCell = null;
                 this.moved();
               } else if (canIMove) {
-                const selectedFigure = this.selectedCell.getFigure();
+                let selectedFigure = this.selectedCell.getFigure();
                 const cellFigure = cell.getFigure();
 
                 // мы бьем фигуру противника
@@ -247,6 +282,45 @@ export class ChessBoard {
 
                   if (!sameSide) {
                     this.handlers?.onBeat(cellFigure, selectedFigure);
+                  }
+                }
+
+                if (selectedFigure && IsPawn(selectedFigure)) {
+                  const canChangePawn = this.isChangePawn(
+                    this.selectedCell,
+                    cell
+                  );
+
+                  if (canChangePawn) {
+                    const selectedFigureSide = selectedFigure.getSide();
+
+                    const newFigure = await this.withLoading({
+                      promise:
+                        this.handlers?.onPawnChange({
+                          pawn: selectedFigure,
+                          nextCell: cell,
+                          availableFigures: [
+                            new Horse({
+                              side: selectedFigureSide,
+                            }),
+                            new Bishop({
+                              side: selectedFigureSide,
+                            }),
+                            new Rook({
+                              side: selectedFigureSide,
+                            }),
+                            new Queen({
+                              side: selectedFigureSide,
+                            }),
+                          ],
+                        }) ?? null,
+                    });
+
+                    selectedFigure =
+                      newFigure ??
+                      new Queen({
+                        side: selectedFigureSide,
+                      });
                   }
                 }
 
@@ -427,7 +501,7 @@ export class ChessBoard {
 
     if (isCheckMate) {
       this.handlers?.onEnd(this.currentSide);
-
+      this.isCheckMate = true;
       return;
     }
 

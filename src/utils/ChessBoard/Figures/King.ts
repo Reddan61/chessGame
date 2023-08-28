@@ -1,14 +1,16 @@
-import KingWhiteSVG from "@svg/KingWhite.svg";
-import KingBlackSVG from "@svg/KingBlack.svg";
 import { Figure, SIDES } from "@utils/ChessBoard/Figures/Figure";
-import { Cell } from "@src/utils/ChessBoard/Cell";
-import { IsRook } from "@src/utils/ChessBoard/Figures/Rook";
+import { Cell } from "@utils/ChessBoard/Cell";
+import { IsRook } from "@utils/ChessBoard/Figures/Rook";
+import { FiguresImages } from "@utils/ChessBoard/Figures/Images";
 
 type Payload = Omit<ConstructorParameters<typeof Figure>["0"], "image">;
 
 export class King extends Figure {
   constructor({ side }: Payload) {
-    const king = side === SIDES.WHITE ? KingWhiteSVG : KingBlackSVG;
+    const king =
+      side === SIDES.WHITE
+        ? FiguresImages["WhiteKing"]
+        : FiguresImages["BlackKing"];
 
     super({
       image: king,
@@ -132,7 +134,7 @@ export class King extends Figure {
         prevKingPosition,
         nextRookPosition,
         nextKingPosition,
-        direction: directionCastling
+        direction: directionCastling,
       });
     });
 

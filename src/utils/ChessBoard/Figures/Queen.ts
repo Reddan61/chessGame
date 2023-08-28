@@ -1,13 +1,15 @@
-import QueenWhiteSVG from "@svg/QueenWhite.svg";
-import QueenBlackSVG from "@svg/QueenBlack.svg";
 import { Figure, SIDES } from "@utils/ChessBoard/Figures/Figure";
-import { Cell } from "@src/utils/ChessBoard/Cell";
+import { Cell } from "@utils/ChessBoard/Cell";
+import { FiguresImages } from "@utils/ChessBoard/Figures/Images";
 
 type Payload = Omit<ConstructorParameters<typeof Figure>["0"], "image">;
 
 export class Queen extends Figure {
   constructor({ side }: Payload) {
-    const bishop = side === SIDES.WHITE ? QueenWhiteSVG : QueenBlackSVG;
+    const bishop =
+      side === SIDES.WHITE
+        ? FiguresImages["WhiteQueen"]
+        : FiguresImages["BlackQueen"];
 
     super({
       image: bishop,

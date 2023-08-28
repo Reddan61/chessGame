@@ -2,7 +2,7 @@ import { ChessBoard } from "@utils/ChessBoard";
 import { Cell } from "@utils/ChessBoard/Cell";
 
 interface FigurePayload {
-  image: string;
+  image: HTMLImageElement;
   side: SIDES;
 }
 
@@ -29,10 +29,7 @@ export class Figure {
   private image: HTMLImageElement;
 
   constructor({ image, side }: FigurePayload) {
-    const img = new Image();
-    img.src = image;
-
-    this.image = img;
+    this.image = image;
     this.side = side;
   }
 

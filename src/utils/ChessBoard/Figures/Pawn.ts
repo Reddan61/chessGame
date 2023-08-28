@@ -1,13 +1,15 @@
 import { ChessBoard } from "@utils/ChessBoard";
-import PawnBlackSVG from "@svg/PawnBlack.svg";
-import PawnWhiteSVG from "@svg/PawnWhite.svg";
 import { Cell } from "@utils/ChessBoard/Cell";
 import { Figure, SIDES } from "./Figure";
+import { FiguresImages } from "@utils/ChessBoard/Figures/Images";
 
 type Payload = Omit<ConstructorParameters<typeof Figure>["0"], "image">;
 export class Pawn extends Figure {
   constructor({ side }: Payload) {
-    const pawn = side === SIDES.WHITE ? PawnWhiteSVG : PawnBlackSVG;
+    const pawn =
+      side === SIDES.WHITE
+        ? FiguresImages["WhitePawn"]
+        : FiguresImages["BlackPawn"];
 
     super({
       image: pawn,
@@ -26,7 +28,7 @@ export class Pawn extends Figure {
     const availableCells: ReturnType<Figure["getAvailableCells"]> = {
       beat: [],
       move: [],
-      castling: []
+      castling: [],
     };
 
     const directionsDiagonal = [
@@ -67,3 +69,5 @@ export class Pawn extends Figure {
     return availableCells;
   }
 }
+
+export const IsPawn = (figure: Figure) => figure instanceof Pawn;
