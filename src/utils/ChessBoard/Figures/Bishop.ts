@@ -1,13 +1,15 @@
-import BishopWhiteSVG from "@svg/BishopWhite.svg";
-import BishopBlackSVG from "@svg/BishopBlack.svg";
 import { Figure, SIDES } from "@utils/ChessBoard/Figures/Figure";
-import { Cell } from "@src/utils/ChessBoard/Cell";
+import { Cell } from "@utils/ChessBoard/Cell";
+import { FiguresImages } from "@utils/ChessBoard/Figures/Images";
 
 type Payload = Omit<ConstructorParameters<typeof Figure>["0"], "image">;
 
 export class Bishop extends Figure {
   constructor({ side }: Payload) {
-    const bishop = side === SIDES.WHITE ? BishopWhiteSVG : BishopBlackSVG;
+    const bishop =
+      side === SIDES.WHITE
+        ? FiguresImages["WhiteBishop"]
+        : FiguresImages["BlackBishop"];
 
     super({
       image: bishop,
@@ -29,7 +31,7 @@ export class Bishop extends Figure {
     const availableCells: ReturnType<Figure["getAvailableCells"]> = {
       beat: [],
       move: [],
-      castling: []
+      castling: [],
     };
 
     const { x, y } = myCell.getPosition();

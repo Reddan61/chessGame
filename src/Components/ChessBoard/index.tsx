@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { ReactElement, useCallback, useEffect, useRef, useState } from "react";
 import { ChessBoard as ChessBoardGame, Handlers } from "@utils/ChessBoard";
 import { getObjectKeys } from "@utils/index";
 import { SIDES } from "@utils/ChessBoard/Figures/Figure";
+import { ChangePawnModal } from "@src/Components/ChangePawnModal";
 import classes from "./index.modules.scss";
 
 interface Config {
@@ -13,7 +14,6 @@ interface Config {
 }
 
 export const ChessBoard = () => {
-  const boardRef = useRef<HTMLCanvasElement | null>(null);
   const [board, setBoard] = useState<ChessBoardGame | null>(null);
   const [config, setConfig] = useState<Config>({
     currentSide: null,
@@ -22,6 +22,9 @@ export const ChessBoard = () => {
       [SIDES.BLACK]: [],
     },
   });
+  const [Modal, setModal] = useState<ReactElement | null>(null);
+  
+  const boardRef = useRef<HTMLCanvasElement | null>(null);
 
   const changeSideHandler = useCallback((currentSide: SIDES) => {
     setConfig((state) => ({
@@ -49,6 +52,41 @@ export const ChessBoard = () => {
     }, 0);
   }, []);
 
+  const onPawnChange = useCallback<Handlers["onPawnChange"]>(
+    ({ nextCell, availableFigures }) => {
+      return new Promise((res) => {
+        const images = availableFigures.map((figure) => figure.getImage().src);
+        const { startX, startY } = nextCell.getPosition();
+
+        const canvas = boardRef.current
+
+        if (!canvas) {
+          return res(null)
+        }
+
+        const { left, top } = canvas.getBoundingClientRect()
+
+        const newX = left + startX
+        const newY = top + startY
+
+        setModal(
+          <ChangePawnModal
+            options={{
+              x: newX,
+              y: newY,
+            }}
+            images={images}
+            onChange={(i) => {
+              setModal(null);
+              res(availableFigures[i]);
+            }}
+          />
+        );
+      });
+    },
+    []
+  );
+
   const restart = () => {
     if (!board) return;
 
@@ -72,6 +110,7 @@ export const ChessBoard = () => {
           changeSide: changeSideHandler,
           onBeat: onBeatHandler,
           onEnd,
+          onPawnChange,
         })
       );
     }
@@ -79,6 +118,7 @@ export const ChessBoard = () => {
 
   return (
     <div className={classes.body}>
+      {Modal}
       <div className={classes.left}>
         <div className={classes.header}>
           ХОД {config.currentSide === SIDES.WHITE ? "БЕЛЫХ" : "ЧЕРНЫХ"}

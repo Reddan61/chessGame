@@ -1,13 +1,15 @@
-import RookWhiteSVG from "@svg/RookWhite.svg";
-import RookBlackSVG from "@svg/RookBlack.svg";
 import { Figure, SIDES } from "@utils/ChessBoard/Figures/Figure";
 import { Cell } from "@utils/ChessBoard/Cell";
+import { FiguresImages } from "@utils/ChessBoard/Figures/Images";
 
 type Payload = Omit<ConstructorParameters<typeof Figure>["0"], "image">;
 
 export class Rook extends Figure {
   constructor({ side }: Payload) {
-    const bishop = side === SIDES.WHITE ? RookWhiteSVG : RookBlackSVG;
+    const bishop =
+      side === SIDES.WHITE
+        ? FiguresImages["WhiteRook"]
+        : FiguresImages["BlackRook"];
 
     super({
       image: bishop,
@@ -29,7 +31,7 @@ export class Rook extends Figure {
     const availableCells: ReturnType<Figure["getAvailableCells"]> = {
       beat: [],
       move: [],
-      castling: []
+      castling: [],
     };
 
     const { x, y } = myCell.getPosition();
@@ -50,5 +52,5 @@ export class Rook extends Figure {
 }
 
 export const IsRook = (figure: Figure) => {
-  return figure instanceof Rook
-}
+  return figure instanceof Rook;
+};
