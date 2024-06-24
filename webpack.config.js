@@ -68,7 +68,6 @@ module.exports = {
   },
   module: {
     rules: [
-      // { test: /\.(html)$/, use: ['html-loader'] },
       {
         test: /\.(s[ac]|c)ss$/i,
         use: [
@@ -79,7 +78,7 @@ module.exports = {
         ],
       },
       {
-        test: /\.jsx?$/, // обновляем регулярное выражение для поддержки jsx
+        test: /\.jsx?$/,
         exclude: /node_modules/,
         use: {
           loader: "babel-loader",
